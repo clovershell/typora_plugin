@@ -633,7 +633,7 @@ class MouseGesturesPlugin extends BasePlugin {
             }))
         }
         engine.use(new GestureActionManager({
-            actions: gestures.values(),
+            actions: [...gestures.values()],
             globalCooldown: this.config.COOLDOWN,
         }))
 
