@@ -1,10 +1,10 @@
 const buildProviders = (utils, context) => [
     {
         prefix: "",
-        name: "Tab",
+        name: "Tabs",
         fetch: async () => {
-            const plugin = utils.getBasePlugin("window_tab")
-            return (plugin?.tab?.tabs || []).map(t => ({ title: t.path, action: () => plugin.tab.switchByPath(t.path) }))
+            const manager = utils.getBasePlugin("window_tab")?.tab
+            return (manager?.tabs || []).map(t => ({ title: t.path, action: () => manager.switchByPath(t.path) }))
         }
     },
     {
@@ -18,15 +18,14 @@ const buildProviders = (utils, context) => [
                 if (!ent.path || ent.path === current) return null
                 return { title: ent.path, action: () => isFolder ? utils.openFolder(ent.path) : utils.openFile(ent.path) }
             }
-            return [
-                ...(folders || []).map(mapEntity(true)),
-                ...(files || []).map(mapEntity(false)),
-            ].filter(Boolean)
+            const folderEnts = (folders || []).map(mapEntity(true))
+            const fileEnts = (files || []).map(mapEntity(false))
+            return [...folderEnts, ...fileEnts].filter(Boolean)
         }
     },
     {
         prefix: ">",
-        name: "Plugin",
+        name: "Plugins",
         fetch: async () => {
             const anchor = context.getAnchor()
             const plugins = Object.entries(utils.getAllBasePlugins()).filter(([_, p]) => p.call)
@@ -46,7 +45,7 @@ const buildProviders = (utils, context) => [
     },
     {
         prefix: ">",
-        name: "Operation",
+        name: "Commands",
         fetch: async () => {
             const doExport = async (name) => {
                 const [htmlLike, others] = JSON.parse(await JSBridge.invoke("setting.loadExports"))
@@ -300,7 +299,7 @@ class CommandPalettePlugin extends BasePlugin {
     process = () => {
         this.inputHandler = this.utils.createSmartInputHandler(
             this.entities.input,
-            val => this.executeSearch(val),
+            val => this.doSearch(val),
             { debounceDelay: this.config.DEBOUNCE_INTERVAL }
         )
 
@@ -333,7 +332,7 @@ class CommandPalettePlugin extends BasePlugin {
                 const currentValue = this.view.getInputValue()
                 const isSync = state.query === currentValue && !state.loading
                 if (!isSync) {
-                    await this.executeSearch(currentValue)
+                    await this.doSearch(currentValue)
                 }
                 this.triggerAction()
             }
@@ -353,7 +352,7 @@ class CommandPalettePlugin extends BasePlugin {
         })
     }
 
-    executeSearch = async (rawInput) => {
+    doSearch = async (rawInput) => {
         const currentSessionId = this.store.get().sessionId + 1
         const { prefix, query, keywords } = this.service.resolveInput(rawInput)
         this.store.set({ query: rawInput, keywords, loading: true, sessionId: currentSessionId })
@@ -388,7 +387,7 @@ class CommandPalettePlugin extends BasePlugin {
     setInput = async (input) => {
         this.view.setInputValue(input)
         this.entities.input.focus()
-        await this.executeSearch(input)
+        await this.doSearch(input)
     }
 
     show = async (input = ">") => {

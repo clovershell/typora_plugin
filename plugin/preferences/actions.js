@@ -213,8 +213,7 @@ module.exports = (plugin) => {
             const { response, data } = await utils.formDialog.modal(op)
             if (response === 0) return
             if (data.confirmInput !== title) {
-                const msg = i18n.t("error.incorrectCommand")
-                utils.notification.show(msg, "error")
+                utils.notification.show(i18n.t("error.incorrectCommand"), "error")
             } else {
                 await uninstall()
             }
@@ -253,9 +252,9 @@ module.exports = (plugin) => {
             await utils.formDialog.modal({
                 title: i18n.t("$label.donate"),
                 schema: [
-                    { fields: [{ type: "action", key: "starMe", label: "<b>Star This Project on GitHub</b>" }] },
                     { fields: [{ type: "custom", content: qrcodeCnt, unsafe: true }] },
                     { fields: [{ type: "custom", content: backersCnt, unsafe: true }] },
+                    { fields: [{ type: "action", key: "starMe", label: "<b>Star This Project on GitHub</b>" }] },
                 ],
                 actions: { starMe: actions.visitRepo }
             })

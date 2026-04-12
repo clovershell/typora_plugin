@@ -35,7 +35,7 @@ class utils {
     static PLUGIN_LOAD_ABORT = Symbol.for("plugin:load-abort")  // For plugin's beforeProcess method; return this to stop loading the plugin
 
     static mixins = Object.fromEntries(
-        Object.entries(MIXINS).map(([name, cls]) => [[name], new cls(this, i18n)])
+        Object.entries(MIXINS).map(([name, cls]) => [[name], new cls(this, i18n)]),
     )
 
     static _meta = {}  // Used to pass data in the context menu
@@ -73,6 +73,7 @@ class utils {
         return _path && mountFolder && _path.startsWith(mountFolder)
     }
     static openFile = filepath => {
+        if (!filepath) return
         if (!this.getMountFolder() || this.isUnderMountFolder(filepath)) {
             File.editor.restoreLastCursor()
             File.editor.focusAndRestorePos()
@@ -81,7 +82,9 @@ class utils {
             File.editor.library.openFileInNewWindow(filepath, false)
         }
     }
-    static openFolder = folder => File.editor.library.openFileInNewWindow(folder, true)
+    static openFolder = folder => {
+        if (folder) File.editor.library.openFileInNewWindow(folder, true)
+    }
     static reload = async () => {
         const content = await File.getContent()
         const arg = { fromDiskChange: false, skipChangeCount: true, skipUndo: true, skipStore: true }
@@ -184,7 +187,7 @@ class utils {
     }
 
     static escape = html => {
-        const replacements = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "/": "&#x2F;", "`": "&#x60;", "=": "&#x3D;" }
+        const replacements = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;", "/": "&#x2F;", "`": "&#x60;", "=": "&#x3D;" }
         return html.replace(/[&<>"'`=\/]/g, c => replacements[c])
     }
 
@@ -477,7 +480,7 @@ class utils {
             s: () => date.getSeconds().toString(),
             SSS: () => date.getMilliseconds().toString().padStart(3, "0"),
             S: () => date.getMilliseconds().toString(),
-            a: () => new Intl.DateTimeFormat(locale, { hour: "numeric", hour12: true }).formatToParts(date).find(part => part.type === "dayPeriod")?.value || ""
+            a: () => new Intl.DateTimeFormat(locale, { hour: "numeric", hour12: true }).formatToParts(date).find(part => part.type === "dayPeriod")?.value || "",
         }
         const regex = /(yyyy|yyy|yy|MMMM|MMM|MM|M|dddd|ddd|dd|d|HH|H|hh|h|mm|m|ss|s|SSS|S|a)/g
         return format.replace(regex, (match) => fns[match] ? fns[match]() : match)
@@ -544,7 +547,7 @@ class utils {
             onReset = this.noop,
             onInsufficient = (current, total) => this.notification.show(i18n.t("global", "confirmNeeded", { count: total - current }), "info"),
             onConfirmed,
-        }
+        },
     ) => {
         if (typeof onConfirmed !== "function") {
             throw new Error("onConfirmed must be a Function")
@@ -806,7 +809,7 @@ class utils {
             followSymlinks = false,
             stopOnNonFatalError = false,
             signal = null,
-        }
+        },
     ) => {
         if (signal?.aborted) {
             const reason = signal.reason ?? new DOMException("Signal Aborted", "AbortError")
@@ -936,7 +939,7 @@ class utils {
             cancelId = 1,
             normalizeAccessKeys = true,
             checkboxLabel,
-        }
+        },
     ) => {
         const op = { type, title, message, detail, buttons, defaultId, cancelId, normalizeAccessKeys, checkboxLabel }
         return JSBridge.invoke("dialog.showMessageBox", op)
@@ -1242,7 +1245,7 @@ class utils {
             onMouseDown = null,
             onMouseMove = null,
             onMouseUp = null,
-        }
+        },
     ) => {
         const rafManager = this.getRafManager()
         let startX, startY, startWidth, startHeight
@@ -1293,7 +1296,7 @@ class utils {
             onMouseDown = null,
             onMouseMove = null,
             onMouseUp = null,
-        }
+        },
     ) => {
         const rafManager = this.getRafManager()
         targetEle.addEventListener("mousedown", ev => {
@@ -1348,7 +1351,7 @@ class utils {
             immediateOnCompositionEnd: true, debounceDelay: 0, throttleDelay: 0, minInputLength: 0,
             trimWhitespace: true, caseSensitive: false, enableIMECache: false, maxCacheSize: 10,
             onCompositionStart: null, onCompositionEnd: null, onInput: null,
-            ...options
+            ...options,
         }
 
         const buildExecutor = () => {

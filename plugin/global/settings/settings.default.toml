@@ -1796,6 +1796,81 @@ BUTTONS = [
 ]
 
 
+[mouse_gestures]
+# =========== [ Basic ] ===========
+ENABLE = false
+NAME = ""
+
+# =========== [ Appearance ] ===========
+# Display trajectory
+SHOW_VISUALIZER = true
+
+# Trajectory line width (px)
+TRAJECTORY_LINE_WIDTH = 5
+
+# Head-Up Display
+SHOW_GESTURE_HUD = true
+
+# Trigger Mouse Buttons
+#   middle: Middle Button
+#   right : Right Button
+#   x1    : X1 Button
+#   x2    : X2 Button
+TRIGGER_BUTTONS = ["middle", "right", "x1", "x2"]
+
+## The default base color during a gesture movement. This color is displayed when the current trajectory sequence does not yet match any pre-configured action
+DEFAULT_COLOR = { middle = "#e0af68", right = "#7dcfff", x1 = "#bb9af7", x2 = "#ff9e64" }
+
+# =========== [ Presets Gestures ] ===========
+# Registry of preset gestures
+#   enable  : Enable this gesture
+#   button  : Trigger mouse button ("", "middle", "right", "x1", "x2")
+#   path    : Gesture trajectory (↖ ↗ ↘ ↙ ← ↑ → ↓)
+#   name    : Gesture Name
+#   cooldown: Command cooldown (Defaults: 0)
+#   callback: Execution body
+GESTURES = [
+  { enable = true, button = "right", path = "→", name = "Next Tab", cooldown = 0, execute = "() => this.utils.tryGetPlugin('window_tab')?.tab?.next()" },
+  { enable = true, button = "right", path = "←", name = "Previous Tab", cooldown = 0, execute = "() => this.utils.tryGetPlugin('window_tab')?.tab?.previous()" },
+  { enable = true, button = "right", path = "↓→", name = "Close Tab", cooldown = 0, execute = "() => this.utils.tryGetPlugin('window_tab')?.tab?.closeActive()" },
+  { enable = true, button = "right", path = "↓←", name = "Exit Typora", cooldown = 0, execute = "() => this.utils.exitTypora()" },
+  { enable = true, button = "right", path = "↑↓", name = "Go to Bottom", cooldown = 0, execute = "() => this.utils.jumpToEdge(false)" },
+  { enable = true, button = "right", path = "↓↑", name = "Go to Top", cooldown = 0, execute = "() => this.utils.jumpToEdge(true)" },
+]
+
+# =========== [ Advanced ] ===========
+# Execution Strategy
+#   fourWay : 4-Way
+#   eightWay: 8-Way
+#   adaptive: Smart Adaptive
+STRATEGY = "adaptive"
+
+# Suppression key
+#   ""     : Do NOT use the suppression key
+#   "alt"  : alt
+#   "ctrl" : ctrl
+#   "shift": shift
+#   "meta" : meta
+SUPPRESSION_KEY = "alt"
+
+# Anti-stagnation mechanism. If the pointer does not move within this duration (ms) after pressing the trigger, it's treated as a normal click and the gesture aborts
+# Set to 0 to disable
+START_TIMEOUT = 500
+
+# Idle timeout mechanism. If the pointer pauses for longer than this duration mid-gesture, the current gesture will be forcefully aborted
+# Set to 0 to disable
+IDLE_TIMEOUT = 0
+
+# cooldown time (ms)
+COOLDOWN = 0
+
+# Macro Sampling Radius (px)
+MACRO_RADIUS = 35
+
+# Tail Sampling Radius (px)
+TAIL_RADIUS = 15
+
+
 [slash_commands]
 # =========== [ Basic ] ===========
 ENABLE = true
@@ -3011,7 +3086,7 @@ OUTPUT_FORMAT = "svg"
 SERVER_TIMEOUT = 30000
 
 # Proxy URL
-SERVER_PROXY = ""
+PROXY = ""
 
 # Cached URL Count
 CACHED_URL_COUNT = 20
@@ -3141,12 +3216,12 @@ DEFAULT_LEFT_LINE_COLOR = "#777777"
 DEFAULT_ICON = "\\f075"
 
 # =========== [ Template ] ===========
-# Template: Default sample padding content when inserting a code block
+# Template: Default sample padding content when inserting
 TEMPLATE = "> [!NOTE]\n> Support Type: TIP、BUG、INFO、NOTE、QUOTE、EXAMPLE、CAUTION、FAILURE、WARNING、SUCCESS、QUESTION、ABSTRACT、IMPORTANT"
 
 
 [test]
 # =========== [ Basic ] ===========
-# Only for development, do not enable
+# Developers only. Do NOT enable
 ENABLE = false
 NAME = ""

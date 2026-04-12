@@ -387,6 +387,7 @@ const DEPS = {
     fenceEnhanceButton: { dependencies: Dep.true("ENABLE_BUTTON") },
     fenceEnhanceHotkey: { dependencies: Dep.true("ENABLE_HOTKEY") },
     countFile: { dependencies: Dep.true("ENABLE_FILE_COUNT") },
+    gesturesDisplay: (btn) => ({ dependencies: Dep.and(Dep.or(Dep.true("SHOW_VISUALIZER"), Dep.true("SHOW_GESTURE_HUD")), Dep.contains("TRIGGER_BUTTONS", btn)) }),
 }
 
 const FIELDS = {
@@ -418,10 +419,10 @@ const createOptions = (definitions) => {
                 Object.entries(fields).map(([key, options]) => {
                     const opts = Object.fromEntries(options.map(opt => [opt, `${key}.${opt}`]))
                     return [key, opts]
-                })
+                }),
             )
             return [name, ret]
-        })
+        }),
     )
 }
 
@@ -473,6 +474,12 @@ const OPTS = createOptions({
     resource_manager: {
         RESOURCE_GRAMMARS: ["markdown", "html"],
         TRAVERSE_STRATEGY: ["bfs", "dfs"],
+    },
+    mouse_gestures: {
+        STRATEGY: ["fourWay", "eightWay", "adaptive"],
+        TRIGGER_BUTTONS: ["middle", "right", "x1", "x2"],
+        SUPPRESSION_KEY: ["", "alt", "ctrl", "shift", "meta"],
+        "GESTURES.button": ["", "middle", "right", "x1", "x2"],
     },
     slash_commands: {
         SUGGESTION_TIMING: ["on_input", "debounce"],
@@ -538,7 +545,7 @@ const schema_global = [
                 Tip.action("inspectAllDefaultSettings", "fa fa-codepen"),
                 Tip.action("openSettingsDefaultTomlExternally", "fa fa-external-link-square"),
                 Tip.action("openSettingsUserTomlExternally", "fa fa-external-link-square"),
-            ]
+            ],
         }),
         FIELDS.restoreSettings,
         Action("restoreAllSettings"),
@@ -594,7 +601,7 @@ const schema_window_tab = [
         Select("TAB_DETACHMENT", OPTS.window_tab.TAB_DETACHMENT, { dependencies: Dep.eq("DRAG_STYLE", "JetBrains") }),
         Float("DETACHMENT_THRESHOLD", {
             tooltip: "detachThreshold", min: 0.1, step: 0.1,
-            dependencies: Dep.and(Dep.eq("DRAG_STYLE", "JetBrains"), Dep.eq("TAB_DETACHMENT", "resistant"))
+            dependencies: Dep.and(Dep.eq("DRAG_STYLE", "JetBrains"), Dep.eq("TAB_DETACHMENT", "resistant")),
         }),
         Float("DRAG_NEW_WINDOW_THRESHOLD", { tooltip: "newWindow", min: -1, step: 0.5, dependencies: Dep.ne("TAB_DETACHMENT", "lockVertical") }),
     ),
@@ -1238,6 +1245,55 @@ const schema_custom = [
     BOXES.settingHandler,
 ]
 
+const schema_mouse_gestures = [
+    BOXES.pluginLite,
+    UntitledBox(
+        Switch("SHOW_GESTURE_HUD"),
+        Switch("SHOW_VISUALIZER"),
+        Integer("TRAJECTORY_LINE_WIDTH", { unit: UNITS.pixel, min: 1, dependencies: Dep.true("SHOW_VISUALIZER") }),
+    ),
+    UntitledBox(
+        Select("TRIGGER_BUTTONS", OPTS.mouse_gestures.TRIGGER_BUTTONS, { minItems: 1 }),
+        Color("DEFAULT_COLOR.middle", DEPS.gesturesDisplay("middle")),
+        Color("DEFAULT_COLOR.right", DEPS.gesturesDisplay("right")),
+        Color("DEFAULT_COLOR.x1", DEPS.gesturesDisplay("x1")),
+        Color("DEFAULT_COLOR.x2", DEPS.gesturesDisplay("x2")),
+    ),
+    TableBox(
+        "GESTURES",
+        ["path", "name"],
+        [
+            UntitledBox(
+                Switch("enable"),
+                Text("name"),
+                Select("button", OPTS.mouse_gestures["GESTURES.button"]),
+                Text("path"),
+                Integer("cooldown", { unit: UNITS.millisecond, min: 0 }),
+            ),
+            CodeBox("execute"),
+        ],
+        {
+            enable: true,
+            name: "",
+            button: "",
+            path: "",
+            cooldown: 0,
+            execute: "() => console.log('triggered')",
+        },
+    ),
+    TitledBox(
+        TITLES.advanced,
+        Select("STRATEGY", OPTS.mouse_gestures.STRATEGY, { tooltip: "STRATEGY" }),
+        Select("SUPPRESSION_KEY", OPTS.mouse_gestures.SUPPRESSION_KEY),
+        Integer("START_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "START_TIMEOUT" }),
+        Integer("IDLE_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "IDLE_TIMEOUT" }),
+        Integer("COOLDOWN", { unit: UNITS.millisecond, min: 0, tooltip: "COOLDOWN" }),
+        Integer("MACRO_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "MACRO_RADIUS" }),
+        Integer("TAIL_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "TAIL_RADIUS" }),
+    ),
+    BOXES.settingHandler,
+]
+
 const schema_slash_commands = [
     BOXES.pluginLite,
     TitledBox(
@@ -1752,7 +1808,7 @@ const schema_plantUML = [
     UntitledBox(
         Text("SERVER_URL"),
         Integer("SERVER_TIMEOUT", { unit: UNITS.millisecond, min: 1000 }),
-        Text("SERVER_PROXY"),
+        Text("PROXY"),
         Integer("CACHED_URL_COUNT", { min: 1 }),
         Select("OUTPUT_FORMAT", OPTS.plantUML.OUTPUT_FORMAT),
     ),
@@ -2056,6 +2112,7 @@ const schemas = {
     easy_modify: schema_easy_modify,
     custom: schema_custom,
     action_buttons: schema_action_buttons,
+    mouse_gestures: schema_mouse_gestures,
     slash_commands: schema_slash_commands,
     cjk_symbol_pairing: schema_cjk_symbol_pairing,
     right_outline: schema_right_outline,
@@ -2142,7 +2199,7 @@ const i18n = (
             Object.entries(SPECIAL_PROPS).forEach(([prop, i18nPrefix]) => {
                 if (newField[prop] != null && typeof newField[prop] === "object" && !Array.isArray(newField[prop])) {
                     newField[prop] = Object.fromEntries(
-                        Object.entries(newField[prop]).map(([k, v]) => [k, t(`${i18nPrefix}.${v}`)])
+                        Object.entries(newField[prop]).map(([k, v]) => [k, t(`${i18nPrefix}.${v}`)]),
                     )
                 }
             })
@@ -2173,7 +2230,7 @@ const i18n = (
             const t = (i18nKey) => i18nData[fixedName]?.[i18nKey] ?? i18nData.settings?.[i18nKey] ?? i18nKey
             const translatedBoxes = boxes.map(box => translateBox(box, t))
             return [fixedName, translatedBoxes]
-        })
+        }),
     )
 }
 

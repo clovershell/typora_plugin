@@ -24,58 +24,59 @@ English | [简体中文](https://github.com/obgnail/typora_plugin/blob/master/RE
 | 5    | collapse_table      | Table Folding                                                | ×                  |
 | 6    | md_padding          | Chinese-English Text Spacer                                  |                    |
 | 7    | slash_commands      | Slash Commands                                               |                    |
-| 8    | templater           | File Templater                                               |                    |
-| 9    | resource_manager    | Resource Management                                          |                    |
-| 10   | fence_enhance       | Enhance Fence                                                |                    |
-| 11   | right_outline       | Right Outline                                                |                    |
-| 12   | commander           | Commander                                                    |                    |
-| 13   | command_palette     | Command Palette                                              |                    |
-| 14   | right_click_menu    | Right-Click Menu                                             |                    |
-| 15   | pie_menu            | Pie menu                                                     | ×                  |
-| 16   | datatables          | Enhance Table                                                | ×                  |
-| 17   | preferences         | Preferences                                                  |                    |
-| 18   | markmap             | Provides Markmap support                                     |                    |
-| 19   | echarts             | Provides Echarts support                                     |                    |
-| 20   | chart               | Provides Chart.js support                                    |                    |
-| 21   | drawIO              | Provides DrawIO support                                      |                    |
-| 22   | abc                 | Provides abc.js support                                      |                    |
-| 23   | calendar            | Provides tui.calendar support                                |                    |
-| 24   | wavedrom            | Provides WaveDrom support                                    |                    |
-| 25   | marp                | Provides Marp support                                        |                    |
-| 26   | plantUML            | Provides PlantUML support                                    | ×                  |
-| 27   | callouts            | Provides Callouts support                                    |                    |
-| 28   | text_stylize        | Text stylization                                             |                    |
-| 29   | read_only           | Read-only mode                                               |                    |
-| 30   | blur                | Blur mode                                                    |                    |
-| 31   | kanban              | Kanban                                                       |                    |
-| 32   | timeline            | Timeline                                                     |                    |
-| 33   | chat                | Chat                                                         |                    |
-| 34   | auto_number         | Auto numbering                                               |                    |
-| 35   | image_viewer        | Image viewer                                                 |                    |
-| 36   | cjk_symbol_pairing  | CJK Symbol Pairing                                           |                    |
-| 37   | resize_table        | Table Resizer                                                |                    |
-| 38   | resize_image        | Image Resizer                                                |                    |
-| 39   | export_enhance      | Avoid image loss when exporting to HTML                      |                    |
-| 40   | sidebar_enhance     | Drag & drop to rearrange、Display non-Markdown files、Keep Fold State |                    |
-| 41   | markdownlint        | Markdownlint Check                                           |                    |
-| 42   | truncate_text       | Hide content to improve performance for large files          | ×                  |
-| 43   | dark                | Dark mode                                                    |                    |
-| 44   | no_image            | No image mode                                                |                    |
-| 45   | myopic_defocus      | Defocus Comfort Mode                                         |                    |
-| 46   | updater             | One-click plugin update                                      |                    |
-| 47   | easy_modify         | Editing tools                                                |                    |
-| 48   | editor_width_slider | Adjust writing area width                                    |                    |
-| 59   | asset_root_redirect | Resource Redirection                                         | ×                  |
-| 50   | bookmark            | Bookmark manager                                             | ×                  |
-| 51   | cipher              | Encrypt files                                                | ×                  |
-| 52   | ripgrep             | Search files using ripgrep                                   | ×                  |
-| 53   | article_uploader    | One-click upload blog to supported platforms                 | ×                  |
-| 54   | cursor_history      | Cursor History                                               | ×                  |
-| 55   | static_markers      | Static Markers                                               | ×                  |
-| 56   | custom              | Open platform for user-defined plugins (Advanced)            |                    |
-| 57   | hotkeys             | Hotkey registration center (Advanced)                        |                    |
-| 58   | action_buttons      | Add function buttons in the lower right corner (Advanced)    |                    |
-| 59   | json_rpc            | Typora Automation (Advanced)                                 | ×                  |
+| 8    | mouse_gestures      | Mouse Gestures                                               | ×                  |
+| 9    | templater           | File Templater                                               |                    |
+| 10   | resource_manager    | Resource Management                                          |                    |
+| 11   | fence_enhance       | Enhance Fence                                                |                    |
+| 12   | right_outline       | Right Outline                                                |                    |
+| 13   | commander           | Commander                                                    |                    |
+| 14   | command_palette     | Command Palette                                              |                    |
+| 15   | right_click_menu    | Right-Click Menu                                             |                    |
+| 16   | pie_menu            | Pie menu                                                     | ×                  |
+| 17   | datatables          | Enhance Table                                                | ×                  |
+| 18   | preferences         | Preferences                                                  |                    |
+| 19   | markmap             | Provides Markmap support                                     |                    |
+| 20   | echarts             | Provides Echarts support                                     |                    |
+| 21   | chart               | Provides Chart.js support                                    |                    |
+| 22   | drawIO              | Provides DrawIO support                                      |                    |
+| 23   | abc                 | Provides abc.js support                                      |                    |
+| 24   | calendar            | Provides tui.calendar support                                |                    |
+| 25   | wavedrom            | Provides WaveDrom support                                    |                    |
+| 26   | marp                | Provides Marp support                                        |                    |
+| 27   | plantUML            | Provides PlantUML support                                    | ×                  |
+| 28   | callouts            | Provides Callouts support                                    |                    |
+| 29   | text_stylize        | Text stylization                                             |                    |
+| 30   | read_only           | Read-only mode                                               |                    |
+| 31   | blur                | Blur mode                                                    |                    |
+| 32   | kanban              | Kanban                                                       |                    |
+| 33   | timeline            | Timeline                                                     |                    |
+| 34   | chat                | Chat                                                         |                    |
+| 35   | auto_number         | Auto numbering                                               |                    |
+| 36   | image_viewer        | Image viewer                                                 |                    |
+| 37   | cjk_symbol_pairing  | CJK Symbol Pairing                                           |                    |
+| 38   | resize_table        | Table Resizer                                                |                    |
+| 39   | resize_image        | Image Resizer                                                |                    |
+| 40   | export_enhance      | Avoid image loss when exporting to HTML                      |                    |
+| 41   | sidebar_enhance     | Drag & drop to rearrange、Display non-Markdown files、Keep Fold State |                    |
+| 42   | markdownlint        | Markdownlint Check                                           |                    |
+| 43   | truncate_text       | Hide content to improve performance for large files          | ×                  |
+| 44   | dark                | Dark mode                                                    |                    |
+| 45   | no_image            | No image mode                                                |                    |
+| 46   | myopic_defocus      | Defocus Comfort Mode                                         |                    |
+| 47   | updater             | One-click plugin update                                      |                    |
+| 48   | easy_modify         | Editing tools                                                |                    |
+| 49   | editor_width_slider | Adjust writing area width                                    |                    |
+| 50   | asset_root_redirect | Resource Redirection                                         | ×                  |
+| 51   | bookmark            | Bookmark manager                                             | ×                  |
+| 52   | cipher              | Encrypt files                                                | ×                  |
+| 53   | ripgrep             | Search files using ripgrep                                   | ×                  |
+| 54   | article_uploader    | One-click upload blog to supported platforms                 | ×                  |
+| 55   | cursor_history      | Cursor History                                               | ×                  |
+| 56   | static_markers      | Static Markers                                               | ×                  |
+| 57   | custom              | Open platform for user-defined plugins (Advanced)            |                    |
+| 58   | hotkeys             | Hotkey registration center (Advanced)                        |                    |
+| 59   | action_buttons      | Add function buttons in the lower right corner (Advanced)    |                    |
+| 60   | json_rpc            | Typora Automation (Advanced)                                 | ×                  |
 
 > If you have other needs or find bugs, feel free to [open an issue](https://github.com/obgnail/typora_plugin/issues/new). PRs are also welcome. If you find this project helpful, please give me a star ⭐
 
@@ -202,6 +203,9 @@ Similar to Notion's slash command.
 
 ![slash_commands](assets/slash_commands.gif)
 
+## mouse_gestures
+
+Mouse gestures in Typora.
 
 ### templater
 
@@ -238,6 +242,8 @@ Typora's sidebar cannot display both [File] and [Outline] simultaneously. To sol
 ### command_palette
 
 Similar to VSCode's command palette (Ctrl+Shift+P)
+
+![command_palette](assets/command_palette.png)
 
 
 ### right_click_menu
