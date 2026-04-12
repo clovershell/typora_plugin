@@ -2,11 +2,14 @@ const FenceMarkmap = require("./fence.js")
 const TOCMarkmap = require("./toc.js")
 
 class MarkmapPlugin extends BasePlugin {
-    beforeProcess = () => {
-        this.Lib = {}
-        this.tocMarkmap = this.config.ENABLE_TOC_MARKMAP ? new TOCMarkmap(this) : null
-        this.fenceMarkmap = this.config.ENABLE_FENCE_MARKMAP ? new FenceMarkmap(this) : null
-    }
+    Lib = {}
+    tocMarkmap = this.config.ENABLE_TOC_MARKMAP ? new TOCMarkmap(this) : null
+    fenceMarkmap = this.config.ENABLE_FENCE_MARKMAP ? new FenceMarkmap(this) : null
+    staticActions = this.i18n.fillActions([
+        { act_value: "draw_fence_outline", act_hotkey: this.config.FENCE_HOTKEY, act_hidden: !this.fenceMarkmap },
+        { act_value: "draw_fence_template", act_hidden: !this.fenceMarkmap },
+        { act_value: "toggle_toc", act_hotkey: this.config.TOC_HOTKEY, act_hidden: !this.tocMarkmap },
+    ])
 
     styleTemplate = () => true
 
@@ -14,33 +17,17 @@ class MarkmapPlugin extends BasePlugin {
 
     hotkey = () => [this.tocMarkmap, this.fenceMarkmap].filter(Boolean).flatMap(p => p.hotkey())
 
-    init = () => {
-        this.staticActions = this.i18n.fillActions([
-            { act_value: "draw_fence_outline", act_hotkey: this.config.FENCE_HOTKEY, act_hidden: !this.fenceMarkmap },
-            { act_value: "draw_fence_template", act_hidden: !this.fenceMarkmap },
-            { act_value: "toggle_toc", act_hotkey: this.config.TOC_HOTKEY, act_hidden: !this.tocMarkmap }
-        ])
-    }
-
     process = () => {
-        if (this.tocMarkmap) {
-            this.tocMarkmap.init()
-            this.tocMarkmap.process()
-        }
-        if (this.fenceMarkmap) {
-            this.fenceMarkmap.process()
-        }
+        this.tocMarkmap?.init()
+        this.tocMarkmap?.process()
+        this.fenceMarkmap?.process()
     }
 
     call = async action => {
         if (action === "toggle_toc") {
-            if (this.tocMarkmap) {
-                await this.tocMarkmap.callback(action)
-            }
+            await this.tocMarkmap?.callback(action)
         } else if (action === "draw_fence_template" || action === "draw_fence_outline") {
-            if (this.fenceMarkmap) {
-                await this.fenceMarkmap.callback(action)
-            }
+            await this.fenceMarkmap?.callback(action)
         }
     }
 
@@ -110,5 +97,5 @@ class MarkmapPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: MarkmapPlugin
+    plugin: MarkmapPlugin,
 }

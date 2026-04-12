@@ -138,14 +138,17 @@ yay -S typora-plugin
 
 ## Plugin Usage Instructions
 
-All plugins provide four usage methods:
+All plugins provide seven usage methods:
 
 - Keyboard enthusiasts:
   - Command Palette (see `command_palette` plugin)
+  - Slash commands  (see `slash_commands` plugin)
   - Shortcut keys (see `hotkeys` plugin)
 - Mouse enthusiasts:
   - Right-click in the main text area (see `right_click_menu` plugin)
+  - Mouse gestures (see `mouse_gestures` plugin)
   - Quick buttons (see `action_buttons` plugin)
+  - Pie menu（see `pie_menu` plugin）
 
 
 ### window_tab
@@ -155,22 +158,7 @@ All plugins provide four usage methods:
 
 ### search_multi
 
-Search through a combination of different conditions to accurately find files.
-
-
-Usage example: The search syntax is similar to Google search syntax and supports regular expressions.
-
-| Input                                                 | Search File                                                 |
-| ----------------------------------------------------- | ------------------------------------------------------------ |
-| `pear`                                                | Contains pear                                                |
-| `sour pear`                                           | Contains sour and pear                                       |
-| `sour OR pear`                                        | Contains sour or pear                                        |
-| `"sour pear"`                                         | Contains the phrase sour pear                                |
-| `sour pear -apple`                                    | Contains sour and pear, but not apple                        |
-| `/\bsour\b/ pear mtime=2024-03-12`                    | Matches regex \bsour\b, contains pear, and file modification date is 2024-03-12 |
-| `frontmatter:development OR head=plugin OR strong:MIT` | YAML Front Matter contains development or title content is plugin or bold text contains MIT |
-| `size>10kb (linenum>=1000 OR hasimage=true)`          | File size exceeds 10KB, and the file either has at least 1000 lines or contains images |
-| `thead:k8s h2:prometheus blockcode:"kubectl apply"`   | Table header contains k8s, h2 contains prometheus, code block contains kubectl apply |
+By using Google search syntax and combining different criteria to accurately search for files.
 
 ![search_mutli](assets/search_mutli.gif)
 

@@ -62,7 +62,7 @@ class QualifierMixin {
 
     static PARAM_PROVIDER = {
         basic: (path, file, dir, stats) => ({ path, file, dir, stats }),
-        withContent: async (path, file, dir, stats) => ({ path, file, dir, stats, content: await FsExtra.readFile(path, "utf-8") })
+        withContent: async (path, file, dir, stats) => ({ path, file, dir, stats, content: await FsExtra.readFile(path, "utf-8") }),
     }
 
     static VALIDATE = {
@@ -183,13 +183,14 @@ class QualifierMixin {
  *   {function} match_regexp:   Matches `castResult` with `queryResult` when the user input is a regexp. Defaults to `QualifierMixin.MATCH.regexp`
  */
 class Searcher {
+    MIXIN = QualifierMixin
+    parser = new Parser()
+    qualifiers = new Map()
+
     constructor(plugin) {
-        this.MIXIN = QualifierMixin
         this.config = plugin.config
         this.utils = plugin.utils
         this.i18n = plugin.i18n
-        this.parser = new Parser()
-        this.qualifiers = new Map()
     }
 
     process = () => {
@@ -283,7 +284,7 @@ class Searcher {
             readminutes: ({ path, file, stats, content }) => {
                 const wordsPerMinute = File.option.wordsPerMinute || 300
                 return QUERY.wordnum({ path, file, stats, content }) / wordsPerMinute
-            }
+            },
         }
         const PROCESS = {
             size: { validate: isSize, cast: toBytes },
@@ -380,7 +381,7 @@ class Searcher {
                     types.flatMap((type, idx) => [
                         [`${type}_open`, [idx, 1]],
                         [`${type}_close`, [idx, -1]],
-                    ])
+                    ]),
                 )
                 return node => {
                     const hit = flags.get(node.type)
@@ -392,7 +393,7 @@ class Searcher {
                     }
                     return wrapped
                 }
-            }
+            },
         }
 
         const TRANSFORMER = {
@@ -964,7 +965,7 @@ class Searcher {
             schema: getSchema(),
             data: {
                 grammar: grammar.trim(),
-                expression: '-file:baz  head:"foo bar"  ( linenum<200 | size>2kb | abc )',
+                expression: 'h2:"foo bar"  ( linenum<200 | blockcodelang=java | abc )  -file:baz',
                 presentation: "graph",
                 direction: "LR",
                 optimize: false,
@@ -994,7 +995,7 @@ class Searcher {
                         const direction = ctx.getValue("direction")
                         _toGraph({ expression, optimize, translate, textStyle, direction }).then(data => ctx.setValue("_displayGraph", { hintDetail: data }))
                     }
-                }
+                },
             }],
             collapsibleBox: false,
         }

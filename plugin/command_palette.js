@@ -5,7 +5,7 @@ const buildProviders = (utils, context) => [
         fetch: async () => {
             const manager = utils.getBasePlugin("window_tab")?.tab
             return (manager?.tabs || []).map(t => ({ title: t.path, action: () => manager.switchByPath(t.path) }))
-        }
+        },
     },
     {
         prefix: "#",
@@ -21,7 +21,7 @@ const buildProviders = (utils, context) => [
             const folderEnts = (folders || []).map(mapEntity(true))
             const fileEnts = (files || []).map(mapEntity(false))
             return [...folderEnts, ...fileEnts].filter(Boolean)
-        }
+        },
     },
     {
         prefix: ">",
@@ -34,14 +34,14 @@ const buildProviders = (utils, context) => [
                 const dynamicActions = utils.updatePluginDynamicActions(fixedName, anchor, true) || []
                 const actions = [...staticActions, ...dynamicActions].filter(act => !act.act_disabled && !act.act_hidden)
                 if (actions.length === 0) {
-                    return [{ title: plugin.pluginName || fixedName, action: () => utils.updateAndCallPluginDynamicAction(fixedName, undefined, anchor) }]
+                    return [{ title: `${plugin.pluginName} ( ${fixedName} )`, action: () => utils.updateAndCallPluginDynamicAction(fixedName, undefined, anchor) }]
                 }
                 return actions.map(act => ({
-                    title: `${plugin.pluginName || fixedName} - ${act.act_name}`,
-                    action: () => utils.updateAndCallPluginDynamicAction(fixedName, act.act_value, anchor)
+                    title: `${plugin.pluginName} - ${act.act_name} ( ${fixedName} - ${act.act_value} )`,
+                    action: () => utils.updateAndCallPluginDynamicAction(fixedName, act.act_value, anchor),
                 }))
             })
-        }
+        },
     },
     {
         prefix: ">",
@@ -75,7 +75,7 @@ const buildProviders = (utils, context) => [
                 { title: "Mode: Debug", action: () => JSBridge.invoke("window.toggleDevTools") },
                 ...allThemes.map(theme => ({ title: `Theme: ${theme.replace(/\.css$/gi, "")}`, action: () => ClientCommand.setTheme(theme) })),
             ]
-        }
+        },
     },
     {
         prefix: "@",
@@ -93,7 +93,7 @@ const buildProviders = (utils, context) => [
                 }
                 return acc
             }, [])
-        }
+        },
     },
     {
         prefix: ":",
@@ -113,7 +113,7 @@ const buildProviders = (utils, context) => [
                 action: jump,
                 // preview: jump,
             }]
-        }
+        },
     },
     {
         prefix: "?",
@@ -125,24 +125,22 @@ const buildProviders = (utils, context) => [
                 { title: "# Search Recent Files", prefix: "#" },
                 { title: ": Go to Line", prefix: ":" },
                 { title: "? Help", prefix: "?" },
-                { title: "Search Open Tabs", prefix: "" }
+                { title: "Search Open Tabs", prefix: "" },
             ]
             return helps.map(h => ({
                 title: h.title,
                 action: () => {
                     context.setInput(h.prefix)
                     return false
-                }
+                },
             }))
-        }
+        },
     },
 ]
 
 class Store {
-    constructor() {
-        this.state = { query: "", keywords: [], items: [], activeIndex: 0, loading: false, sessionId: 0 }
-        this.listeners = new Set()
-    }
+    listeners = new Set()
+    state = { query: "", keywords: [], items: [], activeIndex: 0, loading: false, sessionId: 0 }
 
     get() {
         return this.state
@@ -165,8 +163,9 @@ class Store {
 }
 
 class Service {
+    providers = []
+
     constructor(providers) {
-        this.providers = []
         this.registerProviders(...providers)
     }
 
@@ -293,14 +292,13 @@ class CommandPalettePlugin extends BasePlugin {
         this.service = new Service(providers)
         this.view = new View(this.entities, this.utils)
         this.store.subscribe((state, prevState) => this.view.render(state, prevState))
-        this.inputHandler = null
     }
 
     process = () => {
         this.inputHandler = this.utils.createSmartInputHandler(
             this.entities.input,
             val => this.doSearch(val),
-            { debounceDelay: this.config.DEBOUNCE_INTERVAL }
+            { debounceDelay: this.config.DEBOUNCE_INTERVAL },
         )
 
         this.entities.input.addEventListener("keydown", async ev => {
@@ -327,6 +325,7 @@ class CommandPalettePlugin extends BasePlugin {
                 return
             }
             if (ev.key === "Enter") {
+                ev.stopPropagation()
                 ev.preventDefault()
                 if (state.items.length === 0 && !state.loading) return
                 const currentValue = this.view.getInputValue()
@@ -409,5 +408,5 @@ class CommandPalettePlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: CommandPalettePlugin
+    plugin: CommandPalettePlugin,
 }

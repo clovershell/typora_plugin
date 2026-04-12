@@ -1,4 +1,6 @@
 class ResourceManagerPlugin extends BasePlugin {
+    showWarnDialog = true
+
     styleTemplate = () => true
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
@@ -22,7 +24,6 @@ class ResourceManagerPlugin extends BasePlugin {
         </fast-window>`
 
     init = () => {
-        this.showWarnDialog = true
         this.entities = {
             content: this.utils.entities.eContent,
             window: document.querySelector("#plugin-resource-manager"),

@@ -1,9 +1,7 @@
 class ResizeImagePlugin extends BasePlugin {
-    init = () => {
-        this.checkers = Object.entries(this.config.MODIFIER_KEY)
-            .filter(([_, modifier]) => Boolean(modifier))
-            .map(([type, modifier]) => ({ type, check: this.utils.modifierKey(modifier) }))
-    }
+    checkers = Object.entries(this.config.MODIFIER_KEY)
+        .filter(([_, modifier]) => Boolean(modifier))
+        .map(([type, modifier]) => ({ type, check: this.utils.modifierKey(modifier) }))
 
     process = () => {
         this.utils.settings.autoSave(this)
@@ -25,7 +23,7 @@ class ResizeImagePlugin extends BasePlugin {
                 name: this.fixedName,
                 selector: "#write img",
                 stateGetter: el => el.style.cssText,
-                stateRestorer: (el, state) => el.style = state
+                stateRestorer: (el, state) => el.style = state,
             })
         } else {
             this.utils.stateRecorder.unregister(this.fixedName)
@@ -117,7 +115,7 @@ class ResizeImagePlugin extends BasePlugin {
         const actions = this.i18n.fillActions([
             { act_value: "record_resize_state", act_state: this.config.RECORD_RESIZE },
             { act_value: "allow_exceed_limit", act_state: this.config.ALLOW_EXCEED_LIMIT },
-            ...other
+            ...other,
         ])
 
         const img = anchorNode.closest("#write .md-image")?.querySelector("img")
@@ -143,5 +141,5 @@ class ResizeImagePlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: ResizeImagePlugin
+    plugin: ResizeImagePlugin,
 }

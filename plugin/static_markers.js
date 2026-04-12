@@ -1,25 +1,24 @@
 class StaticMarkersPlugin extends BasePlugin {
-    beforeProcess = () => {
-        this.enabled = this.config.STATIC_DEFAULT
-        this.SELECTORS = {
-            strong: '.md-pair-s[md-inline="strong"] .md-meta',
-            em: '.md-pair-s[md-inline="em"] .md-meta',
-            del: '.md-pair-s[md-inline="del"] .md-meta',
-            underline: '.md-pair-s[md-inline="underline"] .md-meta',
-            highlight: '.md-pair-s[md-inline="highlight"] .md-meta',
-            superscript: '.md-pair-s[md-inline="superscript"] .md-meta',
-            subscript: '.md-pair-s[md-inline="subscript"] .md-meta',
-            code: '.md-pair-s[md-inline="code"] .md-meta',
-            inlineMath: '.md-inline-math[md-inline="inline_math"] .md-meta',
-            image: '.md-image.md-img-loaded[md-inline="image"] .md-meta',
-            // errorImage: '.md-image.md-img-error[md-inline="image"] .md-meta',
-            link: '.md-link[md-inline="link"] .md-meta, .md-link[md-inline="link"] .md-content',
-            emoji: '.md-emoji[md-inline="emoji"] .md-meta',
-            footnote: '.md-footnote[md-inline="footnote"] .md-meta',
-            inlineHTML: '.md-html-inline[md-inline="html_inline"] .md-meta',
-        }
-        this._reloadCSS()
+    enabled = this.config.STATIC_DEFAULT
+    SELECTORS = {
+        strong: '.md-pair-s[md-inline="strong"] .md-meta',
+        em: '.md-pair-s[md-inline="em"] .md-meta',
+        del: '.md-pair-s[md-inline="del"] .md-meta',
+        underline: '.md-pair-s[md-inline="underline"] .md-meta',
+        highlight: '.md-pair-s[md-inline="highlight"] .md-meta',
+        superscript: '.md-pair-s[md-inline="superscript"] .md-meta',
+        subscript: '.md-pair-s[md-inline="subscript"] .md-meta',
+        code: '.md-pair-s[md-inline="code"] .md-meta',
+        inlineMath: '.md-inline-math[md-inline="inline_math"] .md-meta',
+        image: '.md-image.md-img-loaded[md-inline="image"] .md-meta',
+        // errorImage: '.md-image.md-img-error[md-inline="image"] .md-meta',
+        link: '.md-link[md-inline="link"] .md-meta, .md-link[md-inline="link"] .md-content',
+        emoji: '.md-emoji[md-inline="emoji"] .md-meta',
+        footnote: '.md-footnote[md-inline="footnote"] .md-meta',
+        inlineHTML: '.md-html-inline[md-inline="html_inline"] .md-meta',
     }
+
+    beforeProcess = () => this._reloadCSS()
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

@@ -1,4 +1,7 @@
 class ExportEnhancePlugin extends BasePlugin {
+    enable = this.config.ENABLE
+    REGEX = new RegExp(`<img.*?src="(.*?)".*?>`, "gs")
+
     beforeProcess = async () => {
         try {
             const isAsync = await this.utils.waitUntil(() => this.utils.exportHelper.isAsync !== undefined)
@@ -10,8 +13,6 @@ class ExportEnhancePlugin extends BasePlugin {
 
     process = () => {
         this.utils.settings.autoSave(this)
-        this.enable = this.config.ENABLE
-        this.regexp = new RegExp(`<img.*?src="(.*?)".*?>`, "gs")
         this.utils.exportHelper.register(this.fixedName, null, this.afterExportToHTML)
     }
 
@@ -22,7 +23,7 @@ class ExportEnhancePlugin extends BasePlugin {
 
         const dirname = this.utils.getCurrentDirPath()
         const imageMap = this.config.EMBED_NETWORK_IMAGES ? (await this.downloadAllImage(html)) : {}
-        return this.utils.asyncReplaceAll(html, this.regexp, async (origin, src) => {
+        return this.utils.asyncReplaceAll(html, this.REGEX, async (origin, src) => {
             try {
                 if (this.utils.isSpecialImage(src)) {
                     return origin
@@ -48,7 +49,7 @@ class ExportEnhancePlugin extends BasePlugin {
 
     downloadAllImage = async html => {
         const imageMap = {} // map src to localFilePath, only for network image
-        const srcList = [...html.matchAll(this.regexp)]
+        const srcList = [...html.matchAll(this.REGEX)]
             .filter(match => match.length === 2 && this.utils.isNetworkImage(match[1]))
             .map(match => match[1])
         const chunks = this.utils.chunk(srcList, this.config.DOWNLOAD_THREADS)
@@ -85,5 +86,5 @@ class ExportEnhancePlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: ExportEnhancePlugin
+    plugin: ExportEnhancePlugin,
 }

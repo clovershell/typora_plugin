@@ -4,6 +4,12 @@
  * You can refer to the `fence_enhance` plugin's editorHotkey for more details.
  */
 class CJKSymbolPairingPlugin extends BasePlugin {
+    rangyText = ""
+    CODES = new Set([
+        "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0",
+        "Backquote", "BracketLeft", "BracketRight", "Backslash", "Semicolon", "Quote", "Comma", "Period", "Slash",
+    ])
+
     beforeProcess = async () => {
         try {
             this.UNDO_SNAP_TYPE = await this.utils.waitUntil(() => File?.editor?.undo?.UndoManager?.SnapFlag)
@@ -14,12 +20,6 @@ class CJKSymbolPairingPlugin extends BasePlugin {
 
     init = () => {
         const toMap = (symbols, predicate = s => [s.input, s.output]) => new Map(symbols.filter(s => s.enable === true).map(predicate))
-
-        this.rangyText = ""
-        this.codeSet = new Set([
-            "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0",
-            "Backquote", "BracketLeft", "BracketRight", "Backslash", "Semicolon", "Quote", "Comma", "Period", "Slash",
-        ])
         this.convertMap = toMap(this.config.AUTO_CONVERT_SYMBOLS)
         this.pairMap = toMap(this.config.AUTO_PAIR_SYMBOLS)
         this.reversePairMap = toMap(this.config.AUTO_PAIR_SYMBOLS, s => [s.output, s.input])
@@ -46,7 +46,7 @@ class CJKSymbolPairingPlugin extends BasePlugin {
             this.utils.entities.eWrite.addEventListener("keydown", ev => {
                 if (document.activeElement.tagName === "TEXTAREA") return
 
-                if (this.config.AUTO_SURROUND_PAIR && this.utils.isIMEActivated(ev) && this.codeSet.has(ev.code)) {
+                if (this.config.AUTO_SURROUND_PAIR && this.utils.isIMEActivated(ev) && this.CODES.has(ev.code)) {
                     this.rangyText = this.utils.getRangyText()
                 }
                 if (this.config.AUTO_DELETE_PAIR && ev.key === "Backspace" && !ev.shiftKey && !ev.altKey && !this.utils.metaKeyPressed(ev)) {
@@ -161,5 +161,5 @@ class CJKSymbolPairingPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: CJKSymbolPairingPlugin
+    plugin: CJKSymbolPairingPlugin,
 }

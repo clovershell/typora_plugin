@@ -1,5 +1,5 @@
 class ABCPlugin extends BasePlugin {
-    init = () => this.ABCJS = null
+    ABCJS = null
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

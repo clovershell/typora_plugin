@@ -1,4 +1,7 @@
 class PreferencesPlugin extends BasePlugin {
+    FALLBACK_MENU = "global"
+    menuStorage = this.utils.getStorage(`${this.fixedName}.menu`)
+
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
     styleTemplate = () => true
@@ -21,8 +24,6 @@ class PreferencesPlugin extends BasePlugin {
         </div>`
 
     init = () => {
-        this.fallbackMenu = "global"
-        this.menuStorage = this.utils.getStorage(`${this.fixedName}.menu`)
         this.entities = {
             dialog: document.querySelector(".plugin-preferences-dialog"),
             menu: document.querySelector(".plugin-preferences-menu"),
@@ -56,7 +57,7 @@ class PreferencesPlugin extends BasePlugin {
                         dialog.style.top = `${top}px`
                         dialog.style.transform = "none"
                     }
-                }
+                },
             })
         }
         const searchInDialog = () => {
@@ -140,13 +141,13 @@ class PreferencesPlugin extends BasePlugin {
     showDialog = async (fixedName) => {
         const plugins = this._getAllPlugins()
         this._fillMenu(plugins)
-        const menu = Object.hasOwn(plugins, fixedName) ? fixedName : this.fallbackMenu
+        const menu = Object.hasOwn(plugins, fixedName) ? fixedName : this.FALLBACK_MENU
         await this.switchMenu(menu, true)
     }
 
     switchMenu = async (fixedName, scrollMenuIntoView = false, scrollMainToTop = true) => {
         if (this.config.HIDE_MENUS.includes(fixedName)) {
-            fixedName = this.fallbackMenu
+            fixedName = this.FALLBACK_MENU
         }
 
         const options = await this._getFormOptions(fixedName)
@@ -258,5 +259,5 @@ class PreferencesPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: PreferencesPlugin
+    plugin: PreferencesPlugin,
 }

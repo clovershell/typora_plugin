@@ -1,4 +1,7 @@
 class ImageViewerPlugin extends BasePlugin {
+    imageGetter = null
+    playTimer = null
+
     styleTemplate = () => ({
         imageMaxWidth: this.config.IMAGE_MAX_WIDTH + "%",
         imageMaxHeight: this.config.IMAGE_MAX_HEIGHT + "%",
@@ -120,8 +123,6 @@ class ImageViewerPlugin extends BasePlugin {
     }
 
     init = () => {
-        this.imageGetter = null
-        this.playTimer = null
         this.entities = {
             viewer: document.getElementById("plugin-image-viewer"),
             mask: document.querySelector("#plugin-image-viewer .viewer-mask"),

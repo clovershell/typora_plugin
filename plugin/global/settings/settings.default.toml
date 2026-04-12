@@ -112,7 +112,8 @@ TAB_SWITCH_ON_CLOSE = "right"
 #   exit     : Exit Typora immediately
 LAST_TAB_CLOSE_ACTION = "blankPage"
 
-# Reopen unclosed tabs on startup: Restores tabs on next launch. Requires Typora's native setting "Open specific folder/Reopen last directory" to be enabled
+# Reopen unclosed tabs on startup: Restores tabs on next launch.
+# Requires Typora's native setting "Open specific folder / Reopen last directory" to be enabled
 REOPEN_TABS_ON_STARTUP = false
 
 # =========== [ Hotkeys ] ===========
@@ -258,7 +259,6 @@ BUILTIN = [
   { name = "VScode", disable = false, shell = "cmd/bash", cmd = "code $f" },
   { name = "Windows Terminal", disable = false, shell = "cmd/bash", cmd = "cd $d && wt" },
   { name = "Git Commit", disable = false, shell = "cmd/bash", cmd = 'cd $m && git add . && git commit -m "update"' },
-  { name = "TotalCommander", disable = true, shell = "cmd/bash", cmd = "D:\\software\\TotalCMD_64bit_11.03\\TOTALCMD64.EXE /O /T /P=L /L=$f" },
 ]
 
 
@@ -318,10 +318,8 @@ DEFAULT_WIDTH_PERCENT = 20
 # =========== [ Basic ] ===========
 ENABLE = true
 NAME = ""
-# Hotkey: Popup
-HOTKEY = ""
-# Hotkey: Fix
-HOTKEY_FIX_LINT = ""
+HOTKEY = ""          # Hotkey: Popup
+HOTKEY_FIX_LINT = "" # Hotkey: Fix
 
 # =========== [ Custom Rules ] ===========
 # Array of paths linking to custom lint rule JS modules (Relative to plugin directory)
@@ -439,7 +437,7 @@ CLICK_HYPERLINK_TO_OPEN_WHEN_READ_ONLY = false
 # Disable context menu: Simplify context menu options to prevent misoperations
 DISABLE_CONTEXT_MENU_WHEN_READ_ONLY = true
 
-# Remain available menu keys: Core menu options to retain when the context menu is disabled (Use dev tools to find data-key attributes)
+# Remain available menu keys: Core menu options to retain when the context menu is disabled (Use devTools to find data-key attributes)
 # Disabled if DISABLE_CONTEXT_MENU_WHEN_READ_ONLY is false
 REMAIN_AVAILABLE_MENU_KEY = ["typora-plugin", "dev-tool", "copy-img"]
 
@@ -1202,7 +1200,7 @@ CUSTOM_HOTKEYS = []
 ENABLE_LANGUAGE_FOLD = true
 
 # Support VitePress-style inline line highlight syntax
-# Example: ```js{2, 5-8} will highlight specific lines dynamically
+# Example: ```js{2, 5-8}``` will highlight specific lines dynamically
 # See: https://vitepress.dev/guide/markdown#line-highlighting-in-code-blocks
 HIGHLIGHT_BY_LANGUAGE = false
 
@@ -1666,7 +1664,8 @@ ENCRYPT_HOTKEY = ""
 DECRYPT_HOTKEY = ""
 
 # =========== [ Secret Key ] ===========
-# Secret Key (Warning: Modifying this renders files encrypted with previous keys un-decryptable)
+# Secret Key
+# Warning: Modifying this renders files encrypted with previous keys un-decryptable
 SECRET_KEY = "n0hLis5FjgQxa3f31sSa2wm37J81g3upTlq9it9WlfK"
 
 # =========== [ Interaction ] ===========
@@ -1771,14 +1770,14 @@ HIDE_BUTTON_HINT = false
 # =========== [ Preset Buttons ] ===========
 # Matrix for preset action buttons
 #   enable    : Enable this button
-#   coordinate: Grid coordinates [row, col] (0-indexed. Positive Y is upward, positive X is leftward)
+#   coordinate: Grid coordinates [X, Y] (0-indexed. Positive X is upward, positive Y is leftward)
 #   icon      : CSS Icon class (Supports Font Awesome 4.1.0 & ionicons 2.0.1)
 #   size      : (Optional) Icon size (Defaults to 17px)
 #   color     : (Optional) Icon color (Defaults to current theme)
 #   bgColor   : (Optional) Background color (Defaults to current theme)
 #   hint      : (Optional) Tooltip text
-#   callback  : (System Callback) Standard format: "PluginName.MethodName"
-#   evil      : (Custom Callback) Executable eval() statement. Overrides 'callback' if configured
+#   callback  : System Callback. Format: "PluginName.MethodName"
+#   evil      : Custom Callback. Executable eval() statement. Overrides 'callback' if configured
 BUTTONS = [
   { enable = true, coordinate = [0, 0], size = "24px", icon = "fa fa-caret-down", evil = "() => this.utils.jumpToEdge(false)" },
   { enable = true, coordinate = [1, 0], size = "24px", icon = "fa fa-caret-up", evil = "() => this.utils.jumpToEdge(true)" },
@@ -1789,10 +1788,6 @@ BUTTONS = [
   { enable = true, coordinate = [1, 1], size = "17px", icon = "fa fa-image", callback = "image_viewer.call" },
   { enable = true, coordinate = [2, 1], size = "17px", icon = "fa fa-th-list", callback = "right_outline.call" },
   { enable = true, coordinate = [3, 1], size = "17px", icon = "fa fa-search", callback = "search_multi.call" },
-  { enable = false, coordinate = [4, 0], size = "17px", icon = "ion-asterisk", color = "#F0F8FF", bgColor = "#FF4500", evil = "() => window.confirm('this is message')" },
-  { enable = false, coordinate = [4, 1], size = "17px", icon = "ion-alert-circled", evil = '() => this.utils.insertFence("javascript")' },
-  { enable = false, coordinate = [5, 0], size = "17px", icon = "ion-bug", evil = "() => require('child_process').exec('cmd /C calc')" },
-  { enable = false, coordinate = [5, 1], size = "17px", icon = "ion-alert", evil = "() => this.utils.openUrl('https://github.com/obgnail/typora_plugin')" },
 ]
 
 
@@ -1802,37 +1797,44 @@ ENABLE = false
 NAME = ""
 
 # =========== [ Appearance ] ===========
-# Display trajectory
-SHOW_VISUALIZER = true
+# Display trajectory: Real time display of trajectory during a gesture movement
+ENABLE_VISUALIZER = true
 
 # Trajectory line width (px)
+# Requires ENABLE_VISUALIZER = true
 TRAJECTORY_LINE_WIDTH = 5
 
-# Head-Up Display
-SHOW_GESTURE_HUD = true
+# Head-Up Display: Real time display of recognized paths and matching commands during a gesture movement
+ENABLE_HUD = true
 
-# Trigger Mouse Buttons
+# Enable sensory feedback
+ENABLE_SENSORY = false
+
+# Trigger Mouse Buttons: Mouse buttons that support triggering gestures. Modifying is not recommended
 #   middle: Middle Button
 #   right : Right Button
 #   x1    : X1 Button
 #   x2    : X2 Button
 TRIGGER_BUTTONS = ["middle", "right", "x1", "x2"]
 
-## The default base color during a gesture movement. This color is displayed when the current trajectory sequence does not yet match any pre-configured action
-DEFAULT_COLOR = { middle = "#e0af68", right = "#7dcfff", x1 = "#bb9af7", x2 = "#ff9e64" }
+# The color of trajectory and hud during a gesture movement
+DEFAULT_COLOR = { middle = "#e0af68", right = "#7dcfff", x1 = "#bb9af7", x2 = "#f7768e" }
 
 # =========== [ Presets Gestures ] ===========
 # Registry of preset gestures
 #   enable  : Enable this gesture
-#   button  : Trigger mouse button ("", "middle", "right", "x1", "x2")
+#   button  : Trigger mouse button ("" for unlimited, "middle", "right", "x1", "x2")
 #   path    : Gesture trajectory (↖ ↗ ↘ ↙ ← ↑ → ↓)
 #   name    : Gesture Name
-#   cooldown: Command cooldown (Defaults: 0)
-#   callback: Execution body
+#   cooldown: Cooldown time to prevent accidental rapid consecutive executions (ms, Defaults to 0)
+#   callback: Executable eval() statement
 GESTURES = [
-  { enable = true, button = "right", path = "→", name = "Next Tab", cooldown = 0, execute = "() => this.utils.tryGetPlugin('window_tab')?.tab?.next()" },
-  { enable = true, button = "right", path = "←", name = "Previous Tab", cooldown = 0, execute = "() => this.utils.tryGetPlugin('window_tab')?.tab?.previous()" },
-  { enable = true, button = "right", path = "↓→", name = "Close Tab", cooldown = 0, execute = "() => this.utils.tryGetPlugin('window_tab')?.tab?.closeActive()" },
+  { enable = true, button = "x1", path = "→", name = "Latest Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.switchToLastActive()" },
+  { enable = true, button = "right", path = "→", name = "Next Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.next()" },
+  { enable = true, button = "right", path = "←", name = "Previous Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.previous()" },
+  { enable = true, button = "right", path = "↓→", name = "Close Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.closeActive()" },
+  { enable = true, button = "right", path = "→↓→", name = "Open In Finder", cooldown = 0, execute = "() => this.utils.showInFinder(this.utils.getBasePlugin('window_tab')?.tab?.current?.path)" },
+  { enable = true, button = "right", path = "↑→↓", name = "Toggle Tab Bar", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.forceToggleTabBar()" },
   { enable = true, button = "right", path = "↓←", name = "Exit Typora", cooldown = 0, execute = "() => this.utils.exitTypora()" },
   { enable = true, button = "right", path = "↑↓", name = "Go to Bottom", cooldown = 0, execute = "() => this.utils.jumpToEdge(false)" },
   { enable = true, button = "right", path = "↓↑", name = "Go to Top", cooldown = 0, execute = "() => this.utils.jumpToEdge(true)" },
@@ -1842,10 +1844,13 @@ GESTURES = [
 # Execution Strategy
 #   fourWay : 4-Way
 #   eightWay: 8-Way
-#   adaptive: Smart Adaptive
+#   adaptive: Adaptive: Prioritizes 8-way recognition, but automatically falls back to 4-way for complex trajectories to improve accuracy
 STRATEGY = "adaptive"
 
-# Suppression key
+# Hysteresis Tolerance: Increases turn-detection threshold (degrees) to filter out jitter at boundary angles
+HYSTERESIS = 8
+
+# Suppression key: When holding down the suppression key and swipe the mouse, it is no longer recognized as a mouse gesture
 #   ""     : Do NOT use the suppression key
 #   "alt"  : alt
 #   "ctrl" : ctrl
@@ -1861,13 +1866,15 @@ START_TIMEOUT = 500
 # Set to 0 to disable
 IDLE_TIMEOUT = 0
 
-# cooldown time (ms)
+# Global Cooldown time to prevent accidental rapid consecutive executions (ms)
 COOLDOWN = 0
 
 # Macro Sampling Radius (px)
+# The minimum pixel distance required to register a new gesture direction. Larger values reduce accidental triggers from hand jitters but require wider hand movements
 MACRO_RADIUS = 35
 
 # Tail Sampling Radius (px)
+# The threshold used to recognize the final, brief trajectory segment upon gesture release. Usually smaller than 'MACRO_RADIUS' to maintain sensitivity at the end of the motion
 TAIL_RADIUS = 15
 
 
@@ -1905,7 +1912,7 @@ ORDER_STRATEGY = "predefined"
 #   Parameterless: /command
 #   Parameterized: /command_param1_param2 (Delimited by FUNC_PARAM_SEPARATOR)
 
-# Parameter separator (Recommended to retain the default value)
+# Parameter separator. Modifying is not recommended
 # If modified (e.g., to '-'), TRIGGER_REGEXP must also be updated to capture the new symbol
 FUNC_PARAM_SEPARATOR = "_"
 
@@ -2129,6 +2136,7 @@ LIST = [
 NAME = "__INTERACTIVE_PLUGINS__"
 LIST = [
   "window_tab",
+  "mouse_gestures",
   "fence_enhance",
   "commander",
   "datatables",
@@ -2211,7 +2219,7 @@ DEPENDENCIES_FAILURE_BEHAVIOR = "readonly"
 # Serialized format for object settings display (Supported: JSON / TOML / YAML)
 OBJECT_SETTINGS_FORMAT = "JSON"
 
-# Hook function for custom form rendering (For developers only)
+# Hook function for custom form rendering (Developers only)
 FORM_RENDERING_HOOK = "(options, fixedName) => options"
 
 
@@ -2571,9 +2579,6 @@ KANBAN_TASK_DESC_MAX_HEIGHT = -1
 
 # Wrap Kanban: Display excessive kanbans via wrapping, instead of relying on horizontal scrollbars
 WRAP = false
-
-# Enable horizontal board scrolling via Ctrl+Wheel over the Kanban area
-CTRL_WHEEL_TO_SWITCH = false
 
 # Support Markdown Syntax: Permit standard inline rendering (highlighting, bolding, etc.) within task bodies
 ALLOW_MARKDOWN_INLINE_STYLE = true
@@ -3079,7 +3084,10 @@ HOTKEY = ""
 #   docker run -d --name plantuml-server -p 8080:8080 plantuml/plantuml-server:jetty
 SERVER_URL = "http://localhost:8080"
 
-# Output Format: Generated image format returned (SVG recommended for best distortion control, or png/txt)
+# Output Format: Generated image format returned
+#  svg: recommended for best distortion control
+#  png
+#  txt
 OUTPUT_FORMAT = "svg"
 
 # Server Timeout: Max wait time requesting image generation from backend (ms)
@@ -3092,7 +3100,7 @@ PROXY = ""
 CACHED_URL_COUNT = 20
 
 # =========== [ Language & Mode ] ===========
-# Language used to render plantUML code Block
+# Language used to render plantUML code block
 LANGUAGE = "plantuml"
 
 # Interactive Mode: Prevents accidental mouse touches
@@ -3127,7 +3135,7 @@ LANGUAGE = "marp"
 INTERACTIVE_MODE = true
 
 # =========== [ Core Config ] ===========
-# marp-core Options: Option object passed to the underlying parsing library
+# Marp Core Options: Option object passed to the underlying parsing library
 # See: https://github.com/marp-team/marp-core?tab=readme-ov-file#constructor-options
 MARP_CORE_OPTIONS = { html = true }
 

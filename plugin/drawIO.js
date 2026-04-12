@@ -1,21 +1,19 @@
 class DrawIOPlugin extends BasePlugin {
-    styleTemplate = () => true
-
-    init = () => {
-        this.INTERACTION_TYPE = {
-            default: {},
-            showOnly: { highlight: "#0000ff", nav: false, resize: false, edit: null, editable: false, lightbox: false, zoom: "1", toolbar: null, "toolbar-nohide": true },
-            clickable: { highlight: "#0000ff", nav: false, resize: true, edit: null, editable: false, toolbar: null, "toolbar-nohide": true },
-            showToolbar: {
-                highlight: "#0000ff", nav: true, resize: true, edit: null, editable: true, lightbox: false,
-                zoom: "1", toolbar: "zoom lightbox layers", "toolbar-position": "inline", "toolbar-nohide": true,
-            },
-        }
-        this._memorizedFetch = this.utils.memoizeLimited(async url => {
-            const resp = await this.utils.fetch(url, { timeout: this.config.SERVER_TIMEOUT, proxy: this.config.PROXY })
-            return resp.text()
-        }, this.config.CACHED_URL_COUNT)
+    INTERACTION_TYPE = {
+        default: {},
+        showOnly: { highlight: "#0000ff", nav: false, resize: false, edit: null, editable: false, lightbox: false, zoom: "1", toolbar: null, "toolbar-nohide": true },
+        clickable: { highlight: "#0000ff", nav: false, resize: true, edit: null, editable: false, toolbar: null, "toolbar-nohide": true },
+        showToolbar: {
+            highlight: "#0000ff", nav: true, resize: true, edit: null, editable: true, lightbox: false,
+            zoom: "1", toolbar: "zoom lightbox layers", "toolbar-position": "inline", "toolbar-nohide": true,
+        },
     }
+    _memorizedFetch = this.utils.memoizeLimited(async url => {
+        const resp = await this.utils.fetch(url, { timeout: this.config.SERVER_TIMEOUT, proxy: this.config.PROXY })
+        return resp.text()
+    }, this.config.CACHED_URL_COUNT)
+
+    styleTemplate = () => true
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

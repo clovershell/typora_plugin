@@ -1,12 +1,10 @@
 class TruncateTextPlugin extends BasePlugin {
-    beforeProcess = () => {
-        this.className = "plugin-truncate-text"
-        this.staticActions = this.i18n.fillActions([
-            { act_name: this.i18n.t("act.hide_front", { remain: this.config.RETAIN_LENGTH }), act_value: "hide_front", act_hotkey: this.config.HIDE_FRONT_HOTKEY },
-            { act_value: "show_all", act_hotkey: this.config.SHOW_ALL_HOTKEY },
-            { act_value: "hide_base_view", act_hotkey: this.config.HIDE_BASE_VIEW_HOTKEY },
-        ])
-    }
+    className = "plugin-truncate-text"
+    staticActions = this.i18n.fillActions([
+        { act_name: this.i18n.t("act.hide_front", { remain: this.config.RETAIN_LENGTH }), act_value: "hide_front", act_hotkey: this.config.HIDE_FRONT_HOTKEY },
+        { act_value: "show_all", act_hotkey: this.config.SHOW_ALL_HOTKEY },
+        { act_value: "hide_base_view", act_hotkey: this.config.HIDE_BASE_VIEW_HOTKEY },
+    ])
 
     hotkey = () => [
         { hotkey: this.config.HIDE_FRONT_HOTKEY, callback: () => this.call("hide_front") },
@@ -19,14 +17,14 @@ class TruncateTextPlugin extends BasePlugin {
     }
 
     hideFront = () => {
-        const write = this.utils.entities.eWrite
-        const length = write.children.length
-        if (length > this.config.RETAIN_LENGTH) {
-            for (let i = 0; i <= length - this.config.RETAIN_LENGTH; i++) {
-                const el = write.children[i]
-                el.classList.add(this.className)
-                el.style.display = "none"
-            }
+        const children = this.utils.entities.eWrite.children
+        const len = children.length
+        const retainLength = this.config.RETAIN_LENGTH
+        if (len <= retainLength) return
+        for (let i = 0; i < len - retainLength; i++) {
+            const el = children[i]
+            el.classList.add(this.className)
+            el.style.display = "none"
         }
     }
 
@@ -37,10 +35,11 @@ class TruncateTextPlugin extends BasePlugin {
     }
 
     hideBaseView = () => {
-        const write = this.utils.entities.eWrite
+        const children = this.utils.entities.eWrite.children
+
         let start = 0, end = 0
-        write.children.forEach((ele, idx) => {
-            if (this.utils.isInViewBox(ele)) {
+        children.forEach((el, idx) => {
+            if (this.utils.isInViewBox(el)) {
                 if (!start) start = idx
                 start = Math.min(start, idx)
                 end = Math.max(end, idx)
@@ -49,16 +48,12 @@ class TruncateTextPlugin extends BasePlugin {
 
         const halfLength = this.config.RETAIN_LENGTH / 2
         start = Math.max(start - halfLength, 0)
-        end = Math.min(end + halfLength, write.children.length)
+        end = Math.min(end + halfLength, children.length)
 
-        write.children.forEach((el, idx) => {
-            if (idx < start || idx > end) {
-                el.classList.add(this.className)
-                el.style.display = "none"
-            } else {
-                el.classList.remove(this.className)
-                el.style.display = ""
-            }
+        children.forEach((el, idx) => {
+            const hide = idx < start || idx > end
+            el.classList.toggle(this.className, hide)
+            el.style.display = hide ? "none" : ""
         })
     }
 
@@ -80,5 +75,5 @@ class TruncateTextPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: TruncateTextPlugin
+    plugin: TruncateTextPlugin,
 }

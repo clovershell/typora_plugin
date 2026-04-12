@@ -1,8 +1,6 @@
 class DataTablesPlugin extends BasePlugin {
-    init = () => {
-        this.dataTablesConfig = null
-        this.tableList = []
-    }
+    dataTablesConfig = null
+    tableList = []
 
     process = () => {
         this.utils.eventHub.addEventListener(this.utils.eventHub.eventType.otherFileOpened, this.destroyAllDataTable)
@@ -77,7 +75,7 @@ class DataTablesPlugin extends BasePlugin {
                 infoThousands: ",",
                 thousands: ".",
                 paginate: { first: "<<", previous: "<", next: ">", last: ">>" },
-            }
+            },
         }
         if (!this.config.DEFAULT_ORDER) {
             this.dataTablesConfig.order = []
@@ -140,5 +138,5 @@ class DataTablesPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: DataTablesPlugin
+    plugin: DataTablesPlugin,
 }

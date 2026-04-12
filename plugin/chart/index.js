@@ -1,5 +1,5 @@
 class ChartPlugin extends BasePlugin {
-    init = () => this.ChartPkg = null
+    ChartPkg = null
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

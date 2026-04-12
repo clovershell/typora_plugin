@@ -1,10 +1,8 @@
 class DarkModePlugin extends BasePlugin {
-    styleTemplate = () => true
+    className = "plugin-dark"
+    isDarkMode = this.config.DARK_DEFAULT
 
-    init = () => {
-        this.class = "plugin-dark"
-        this.isDarkMode = this.config.DARK_DEFAULT
-    }
+    styleTemplate = () => true
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
@@ -19,7 +17,7 @@ class DarkModePlugin extends BasePlugin {
     }
 
     _toggleDarkMode = enable => {
-        document.documentElement.classList.toggle(this.class, enable)
+        document.documentElement.classList.toggle(this.className, enable)
         this.isDarkMode = enable
     }
 
@@ -29,5 +27,5 @@ class DarkModePlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: DarkModePlugin
+    plugin: DarkModePlugin,
 }

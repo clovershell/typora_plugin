@@ -1,9 +1,7 @@
 class CollapseTablePlugin extends BasePlugin {
-    styleTemplate = () => true
+    className = "plugin-collapse-table"
 
-    init = () => {
-        this.className = "plugin-collapse-table"
-    }
+    styleTemplate = () => true
 
     process = () => {
         this.utils.settings.autoSave(this)

@@ -1,4 +1,7 @@
 class MarkdownlintPlugin extends BasePlugin {
+    fixInfos = []
+    TRANSLATIONS = this.i18n.entries([...Object.keys(this.i18n.data)].filter(e => e.startsWith("MD")))
+
     // Markdownlint config supports names and aliases,
     // keys are not case-sensitive and processed in order from top to bottom with later values overriding earlier ones.
     // To simplify the main processing logic, we first normalize the config by resolving all aliases to their names.
@@ -33,15 +36,12 @@ class MarkdownlintPlugin extends BasePlugin {
 
     init = () => {
         this.linter = this._createLinter(this._onCheck, this._onFix)
-        this.fixInfos = []
         this.entities = {
             window: document.querySelector("#plugin-markdownlint"),
             wrap: document.querySelector(".plugin-markdownlint-table-wrap"),
             table: document.querySelector(".plugin-markdownlint-table"),
             button: document.querySelector("#plugin-markdownlint-button"),
         }
-        this.TRANSLATIONS = this.i18n.entries([...Object.keys(this.i18n.data)].filter(e => e.startsWith("MD")))
-
         this._initTableColumns()
     }
 
@@ -215,7 +215,7 @@ class MarkdownlintPlugin extends BasePlugin {
                     const settings = await this.utils.settings.readCustom()
                     this.config = settings[this.fixedName]
                     this.utils.notification.show(this.i18n.t("success.restore"))
-                    await this.utils.formDialog.updateModal(op => op.data = getData())
+                    await this.utils.formDialog.refresh(op => op.data = getData())
                 }
             }),
         })

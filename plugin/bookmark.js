@@ -1,4 +1,34 @@
 class BookmarkPlugin extends BasePlugin {
+    recordSelector = "#write [cid]"
+    className = "plu-bookmark"
+    locateUtils = {
+        file: "",
+        idx: -1,
+        time: Date.now(),
+        getEl: (idx) => [...document.querySelectorAll(this.recordSelector)][idx],
+        scroll: (idx) => {
+            const el = this.locateUtils.getEl(idx)
+            if (el) this.utils.scroll(el, { height: 20, moveCursor: true })
+        },
+    }
+    recorder = {
+        register: () => this.utils.stateRecorder.register({
+            name: this.fixedName,
+            selector: this.recordSelector,
+            stateGetter: el => el.classList.contains(this.className),
+            stateRestorer: el => el.classList.add(this.className),
+            finalFn: () => {
+                if (this.locateUtils.file && this.locateUtils.idx !== -1) {
+                    this.locateUtils.scroll(this.locateUtils.idx)
+                    this.locateUtils.file = ""
+                    this.locateUtils.idx = -1
+                }
+            },
+        }),
+        collect: () => this.utils.stateRecorder.collect(this.fixedName),
+        getState: () => this.utils.stateRecorder.getState(this.fixedName),
+    }
+
     styleTemplate = () => true
 
     html = () => `<fast-window id="plugin-bookmark" window-title="${this.pluginName}" window-buttons="close|fa-times" hidden><div class="plugin-bookmark-list"></div></fast-window>`
@@ -6,37 +36,6 @@ class BookmarkPlugin extends BasePlugin {
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
     init = () => {
-        this.recordSelector = "#write [cid]"
-        this.className = "plu-bookmark"
-        this.locateUtils = {
-            file: "",
-            idx: -1,
-            time: Date.now(),
-            getEl: (idx) => [...document.querySelectorAll(this.recordSelector)][idx],
-            scroll: (idx) => {
-                const el = this.locateUtils.getEl(idx)
-                if (el) this.utils.scroll(el, { height: 20, moveCursor: true })
-            }
-        }
-        this.recorder = {
-            register: () => {
-                this.utils.stateRecorder.register({
-                    name: this.fixedName,
-                    selector: this.recordSelector,
-                    stateGetter: el => el.classList.contains(this.className),
-                    stateRestorer: el => el.classList.add(this.className),
-                    finalFn: () => {
-                        if (this.locateUtils.file && this.locateUtils.idx !== -1) {
-                            this.locateUtils.scroll(this.locateUtils.idx)
-                            this.locateUtils.file = ""
-                            this.locateUtils.idx = -1
-                        }
-                    }
-                })
-            },
-            collect: () => this.utils.stateRecorder.collect(this.fixedName),
-            getState: () => this.utils.stateRecorder.getState(this.fixedName),
-        }
         this.entities = {
             write: this.utils.entities.eWrite,
             window: document.querySelector("#plugin-bookmark"),
@@ -140,5 +139,5 @@ class BookmarkPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: BookmarkPlugin
+    plugin: BookmarkPlugin,
 }

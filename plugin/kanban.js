@@ -1,4 +1,7 @@
 class KanbanPlugin extends BasePlugin {
+    STRICT_MODE_STR = "use strict"
+    fenceStrictMode = false  // Is a single fence using strict mode
+
     styleTemplate = () => ({
         maxHeight: (this.config.KANBAN_MAX_HEIGHT < 0) ? "initial" : this.config.KANBAN_MAX_HEIGHT + "px",
         taskDescMaxHeight: (this.config.KANBAN_TASK_DESC_MAX_HEIGHT < 0) ? "initial" : this.config.KANBAN_TASK_DESC_MAX_HEIGHT + "em",
@@ -7,11 +10,6 @@ class KanbanPlugin extends BasePlugin {
     })
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
-
-    init = () => {
-        this.STRICT_MODE_STR = "use strict"
-        this.fenceStrictMode = false  // Is a single fence using strict mode
-    }
 
     process = () => {
         this.utils.diagramParser.register({
@@ -22,16 +20,8 @@ class KanbanPlugin extends BasePlugin {
             cancelFunc: null,
             destroyAllFunc: null,
             exportStyleGetter: this.getStyleContent,
-            interactiveMode: this.config.INTERACTIVE_MODE
+            interactiveMode: this.config.INTERACTIVE_MODE,
         })
-
-        if (this.config.CTRL_WHEEL_TO_SWITCH) {
-            this.utils.entities.eWrite.addEventListener("wheel", ev => {
-                if (!this.utils.metaKeyPressed(ev)) return
-                const target = ev.target.closest(".plugin-kanban-content")
-                if (target) target.scrollLeft += ev.deltaY * 0.5
-            })
-        }
     }
 
     getStyleContent = () => this.utils.styleTemplater.getStyleContent(this.fixedName)
@@ -131,5 +121,5 @@ class KanbanPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: KanbanPlugin
+    plugin: KanbanPlugin,
 }

@@ -1,10 +1,11 @@
 class ActionButtonsPlugin extends BasePlugin {
+    buttons = new Map()
+
     html = () => '<div id="plugin-action-buttons"></div>'
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
     init = () => {
-        this.buttons = new Map()
         this.buttonGroup = document.querySelector("#plugin-action-buttons")
     }
 
@@ -14,18 +15,17 @@ class ActionButtonsPlugin extends BasePlugin {
         this.utils.eventHub.addEventListener(this.utils.eventHub.eventType.toggleSettingPage, this.toggle)
         this.utils.eventHub.addEventListener(this.utils.eventHub.eventType.allPluginsHadInjected, async () => {
             const buttons = this.registerButtons()
-            if (buttons.size) {
-                const maxX = Math.max(-1, ...[...buttons.values()].map(c => c.x))
-                const maxY = Math.max(-1, ...[...buttons.values()].map(c => c.y))
-                await this.utils.styleTemplater.register(this.fixedName, {
-                    rowCount: maxX + 1,
-                    colCount: maxY + 1,
-                    this: this,
-                    buttonColor: "var(--text-color)",
-                    buttonBgColor: "initial",
-                })
-                this.buttonGroup.append(...this.genButtons(maxX, maxY))
-            }
+            if (buttons.size === 0) return
+            const maxX = Math.max(-1, ...[...buttons.values()].map(c => c.x))
+            const maxY = Math.max(-1, ...[...buttons.values()].map(c => c.y))
+            await this.utils.styleTemplater.register(this.fixedName, {
+                rowCount: maxX + 1,
+                colCount: maxY + 1,
+                this: this,
+                buttonColor: "var(--text-color)",
+                buttonBgColor: "initial",
+            })
+            this.buttonGroup.append(...this.genButtons(maxX, maxY))
         })
         this.buttonGroup.addEventListener("mousedown", ev => {
             const target = ev.target.closest(".action-item")
@@ -80,9 +80,7 @@ class ActionButtonsPlugin extends BasePlugin {
                         i.className = btn.icon
                         item.appendChild(i)
                     }
-                    if (!this.config.HIDE_BUTTON_HINT && btn.hint) {
-                        item.setAttribute("ty-hint", btn.hint)
-                    }
+                    if (!this.config.HIDE_BUTTON_HINT && btn.hint) item.setAttribute("ty-hint", btn.hint)
                     if (btn.size) item.style.fontSize = btn.size
                     if (btn.color) item.style.color = btn.color
                     if (btn.bgColor) item.style.backgroundColor = btn.bgColor
@@ -99,5 +97,5 @@ class ActionButtonsPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: ActionButtonsPlugin
+    plugin: ActionButtonsPlugin,
 }

@@ -512,6 +512,9 @@ class FastForm extends HTMLElement {
 }
 
 class LifecycleHooks {
+    _temporaries = new Map()
+    _overrides = new Map()
+
     constructor(defaultImpls, strategies, staticSubscribers = []) {
         this._definitions = new Map(
             Object.entries(defaultImpls).map(([hookName, impl]) => {
@@ -527,8 +530,6 @@ class LifecycleHooks {
                 })
                 .filter(([_, set]) => set.size > 0)
         )
-        this._temporaries = new Map()
-        this._overrides = new Map()
     }
 
     on = (hookName, listener) => {
@@ -2914,8 +2915,9 @@ const Control_Textarea = {
     bindEvents: ({ form }) => {
         form.onEvent("keydown", ".textarea", function (ev) {
             if (utils.metaKeyPressed(ev) && ev.key === "Enter") {
-                form.validateAndCommit(this.dataset.key, this.value)
+                ev.stopPropagation()
                 ev.preventDefault()
+                form.validateAndCommit(this.dataset.key, this.value)
             }
         }, true).onEvent("change", ".textarea", function () {
             form.validateAndCommit(this.dataset.key, this.value)
@@ -2977,6 +2979,7 @@ const Control_CodeEditor = {
                 syncState(this)
                 form.validateAndCommit(key, this.value)
             } else if (ev.key === "Enter") {
+                ev.stopPropagation()
                 ev.preventDefault()
                 const cursor = this.selectionStart
                 const currentLineStart = this.value.lastIndexOf("\n", cursor - 1) + 1

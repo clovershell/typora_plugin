@@ -2,11 +2,12 @@
  * Dynamically register and unregister third-party code block diagram (derived from DiagramParser).
  */
 class ThirdPartyDiagramParser {
+    parsers = new Map()
+    createConfigParser = metaConfigParserFactory()
+    DEFAULT_CSS = { width: "calc(100% - 4px)", height: "300px", backgroundColor: "transparent" }
+
     constructor(utils) {
         this.utils = utils
-        this.parsers = new Map()
-        this.DEFAULT_CSS = { width: "calc(100% - 4px)", height: "300px", backgroundColor: "transparent" }
-        this.createConfigParser = metaConfigParserFactory()
         this.helpers = this.getHelpers()
     }
 

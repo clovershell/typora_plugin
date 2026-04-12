@@ -97,6 +97,19 @@ class UpdaterPlugin extends BasePlugin {
 }
 
 class Updater {
+    latestVersionInfo = null
+    currentVersionInfo = null
+    relpaths = {
+        rootDir: "./plugin",
+        customPluginDir: "./plugin/custom/plugins",
+    }
+    userFiles = [
+        "./plugin/global/user_space",
+        "./plugin/global/user_styles",
+        "./plugin/global/settings/settings.user.toml",
+        "./plugin/global/settings/custom_plugin.user.toml",
+    ]
+
     constructor(plugin, latestReleaseUrl, proxy, timeout) {
         this.utils = plugin.utils
         this.latestReleaseUrl = latestReleaseUrl
@@ -111,19 +124,6 @@ class Updater {
             workDir: this.path.join(this.utils.tempFolder, "typora-plugin-updater"),
             backupDir: this.path.join(this.utils.tempFolder, "typora-plugin-updater-backup"),
         }
-        this.relpaths = {
-            rootDir: "./plugin",
-            customPluginDir: "./plugin/custom/plugins",
-        }
-        this.userFiles = [
-            "./plugin/global/user_space",
-            "./plugin/global/user_styles",
-            "./plugin/global/settings/settings.user.toml",
-            "./plugin/global/settings/custom_plugin.user.toml",
-        ]
-
-        this.latestVersionInfo = null
-        this.currentVersionInfo = null
     }
 
     async run() {

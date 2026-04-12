@@ -1,7 +1,7 @@
 class MarpPlugin extends BasePlugin {
-    styleTemplate = () => true
+    marp = null
 
-    init = () => this.marp = null
+    styleTemplate = () => true
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

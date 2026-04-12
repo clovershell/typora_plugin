@@ -1,4 +1,6 @@
 class EasyModifyPlugin extends BasePlugin {
+    _showWarnDialog = true
+
     hotkey = () => [
         { hotkey: this.config.HOTKEY_COPY_FULL_PATH, callback: () => this.call("copy_full_path") },
         { hotkey: this.config.HOTKEY_INCREASE_HEADERS_LEVEL, callback: () => this.call("increase_headers_level") },
@@ -18,8 +20,6 @@ class EasyModifyPlugin extends BasePlugin {
     init = () => {
         const notRecommended = this.i18n.t("actHint.notRecommended")
         const defaultDoc = this.i18n.t("actHint.defaultDoc")
-
-        this._showWarnDialog = true
         this.staticActions = [
             { act_value: "copy_full_path", ...this._getActionParts("HOTKEY_COPY_FULL_PATH") },
             { act_value: "increase_headers_level", ...this._getActionParts("HOTKEY_INCREASE_HEADERS_LEVEL"), act_hint: defaultDoc },
@@ -35,11 +35,6 @@ class EasyModifyPlugin extends BasePlugin {
     _getActionParts = (label) => ({ act_hotkey: this.config[label], act_name: this.i18n.t(`$label.${label}`) })
 
     getDynamicActions = (anchorNode, meta) => {
-        const I18N = {
-            noSelection: this.i18n.t("act.extract_range_to_new_file.noSelection"),
-            positionEmptyLine: this.i18n.t("act.extract_range_to_new_file.positionEmptyLine")
-        }
-
         meta.range = window.getSelection().getRangeAt(0)
         const extract = {
             act_value: "extract_range_to_new_file",
@@ -47,7 +42,7 @@ class EasyModifyPlugin extends BasePlugin {
             ...this._getActionParts("HOTKEY_EXTRACT_RANGE_TO_NEW_FILE"),
         }
         if (extract.act_disabled) {
-            extract.act_hint = I18N.noSelection
+            extract.act_hint = this.i18n.t("act.extract_range_to_new_file.noSelection")
         }
 
         meta.innermostAnchor = anchorNode.closest("#write [cid]")
@@ -55,7 +50,7 @@ class EasyModifyPlugin extends BasePlugin {
         meta.insertAnchor = anchorNode.closest('#write > p[mdtype="paragraph"]')
         meta.imageAnchor = anchorNode.closest("#write .md-image.md-img-loaded")
         const act_disabled = !meta.insertAnchor || meta.insertAnchor.querySelector("p > span")
-        const act_hint = act_disabled ? I18N.positionEmptyLine : ""
+        const act_hint = act_disabled ? this.i18n.t("act.extract_range_to_new_file.positionEmptyLine") : ""
         const insert = [
             { act_value: "insert_mermaid_mindmap", ...this._getActionParts("HOTKEY_INSERT_MERMAID_MINDMAP"), act_disabled, act_hint },
             { act_value: "insert_mermaid_graph", ...this._getActionParts("HOTKEY_INSERT_MERMAID_GRAPH"), act_disabled, act_hint },
@@ -272,7 +267,7 @@ class EasyModifyPlugin extends BasePlugin {
                     return ret
                 }
                 return getTokens(tree, ["graph LR", "\n"])
-            }
+            },
         }
         const func = mermaidFunc[type]
         if (!func) return
@@ -355,5 +350,5 @@ class EasyModifyPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: EasyModifyPlugin
+    plugin: EasyModifyPlugin,
 }

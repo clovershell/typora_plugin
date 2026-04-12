@@ -2,6 +2,14 @@ const Searcher = require("./searcher")
 const Highlighter = require("./highlighter")
 
 class SearchMultiPlugin extends BasePlugin {
+    cancelController = null
+    searcher = new Searcher(this)
+    highlighter = new Highlighter(this)
+    allowedExtensions = new Set(this.config.ALLOW_EXT.map(ext => {
+        const prefix = (ext !== "" && !ext.startsWith(".")) ? "." : ""
+        return prefix + ext.toLowerCase()
+    }))
+
     styleTemplate = () => {
         const colors_style = this.config.HIGHLIGHT_COLORS
             .map((color, idx) => `.cm-plugin-highlight-hit-${idx} { background-color: ${color} !important; }`)
@@ -39,13 +47,6 @@ class SearchMultiPlugin extends BasePlugin {
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
     init = () => {
-        this.cancelController = null
-        this.searcher = new Searcher(this)
-        this.highlighter = new Highlighter(this)
-        this.allowedExtensions = new Set(this.config.ALLOW_EXT.map(ext => {
-            const prefix = (ext !== "" && !ext.startsWith(".")) ? "." : ""
-            return prefix + ext.toLowerCase()
-        }))
         this.entities = {
             window: document.querySelector("#plugin-search-multi"),
             form: document.querySelector("#plugin-search-multi-form"),
@@ -263,5 +264,5 @@ class SearchMultiPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: SearchMultiPlugin
+    plugin: SearchMultiPlugin,
 }

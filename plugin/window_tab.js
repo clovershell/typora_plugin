@@ -1,4 +1,8 @@
 class TabManager {
+    _tabs = []
+    _activeIdx = 0
+    _localOpen = false
+
     constructor(context) {
         this.utils = context.utils
         this.i18n = context.i18n
@@ -8,9 +12,6 @@ class TabManager {
             onEmpty: context.onEmpty,
             onExit: context.onExit,
         }
-        this._tabs = []
-        this._activeIdx = 0
-        this._localOpen = false
     }
 
     get tabs() {
@@ -304,6 +305,44 @@ class TabManager {
 }
 
 class WindowTabPlugin extends BasePlugin {
+    checkTabsInterval = null
+    renderRafManager = this.utils.getRafManager()
+    manualSaveStorage = this.utils.getStorage(`${this.fixedName}.manual`)
+    autoSaveStorage = this.utils.getStorage(`${this.fixedName}.auto`)
+    staticActions = this.i18n.fillActions([
+        { act_value: "sort_tabs", act_hotkey: this.config.SORT_TABS_HOTKEY },
+        { act_value: "save_tabs" },
+    ])
+    tab = new TabManager({
+        utils: this.utils,
+        i18n: this.i18n,
+        config: this.config,
+        onRender: (wantOpenPath) => {
+            this.renderRafManager.schedule(() => {
+                this._showTabBar()
+                this._startCheckTabsInterval()
+                this._renderTabs(wantOpenPath)
+            })
+        },
+        onEmpty: async () => {
+            this._hideTabBar()
+            this._stopCheckTabsInterval()
+            this.tab.reset()
+            File.bundle = {
+                filePath: "", originalPath: null, untitledId: +new Date,
+                fileName: null, fileEncode: null, removed: false,
+                useCRLF: File.useCRLF || false, unsupported: "",
+                hasModified: false, modifiedDate: null, lastSnapDate: null,
+                savedContent: null, isLocked: false, oversize: false,
+                fileMissingWhenOpen: false, bundleFile: null, zip: null,
+            }
+            await this.utils.reload()
+            document.getElementById("title-text").innerHTML = "Typora"
+            document.querySelector(".file-library-node.active")?.classList.remove("active")
+        },
+        onExit: () => this.utils.exitTypora(),
+    })
+
     beforeProcess = () => {
         if (window._options.framelessWindow && this.config.HIDE_WINDOW_TITLE_BAR) {
             document.querySelector("header").style.zIndex = "897"
@@ -329,14 +368,6 @@ class WindowTabPlugin extends BasePlugin {
     ]
 
     init = () => {
-        this.checkTabsInterval = null
-        this.renderRafManager = this.utils.getRafManager()
-        this.manualSaveStorage = this.utils.getStorage(`${this.fixedName}.manual`)
-        this.autoSaveStorage = this.utils.getStorage(`${this.fixedName}.auto`)
-        this.staticActions = this.i18n.fillActions([
-            { act_value: "sort_tabs", act_hotkey: this.config.SORT_TABS_HOTKEY },
-            { act_value: "save_tabs" },
-        ])
         this.entities = {
             content: this.utils.entities.eContent,
             header: document.querySelector("header"),
@@ -344,35 +375,6 @@ class WindowTabPlugin extends BasePlugin {
             tabBar: document.querySelector("#plugin-window-tab .tab-bar"),
             windowTab: document.querySelector("#plugin-window-tab"),
         }
-        this.tab = new TabManager({
-            utils: this.utils,
-            i18n: this.i18n,
-            config: this.config,
-            onRender: (wantOpenPath) => {
-                this.renderRafManager.schedule(() => {
-                    this._showTabBar()
-                    this._startCheckTabsInterval()
-                    this._renderTabs(wantOpenPath)
-                })
-            },
-            onEmpty: async () => {
-                this._hideTabBar()
-                this._stopCheckTabsInterval()
-                this.tab.reset()
-                File.bundle = {
-                    filePath: "", originalPath: null, untitledId: +new Date,
-                    fileName: null, fileEncode: null, removed: false,
-                    useCRLF: File.useCRLF || false, unsupported: "",
-                    hasModified: false, modifiedDate: null, lastSnapDate: null,
-                    savedContent: null, isLocked: false, oversize: false,
-                    fileMissingWhenOpen: false, bundleFile: null, zip: null
-                }
-                await this.utils.reload()
-                document.getElementById("title-text").innerHTML = "Typora"
-                document.querySelector(".file-library-node.active")?.classList.remove("active")
-            },
-            onExit: () => this.utils.exitTypora()
-        })
     }
 
     process = () => {
@@ -474,7 +476,7 @@ class WindowTabPlugin extends BasePlugin {
                     const { left, top } = this.getBoundingClientRect()
                     const resetAnimation = cloned.animate(
                         [{ transform: cloned.style.transform }, { transform: `translate3d(${left}px, ${top}px, 0)` }],
-                        { duration: 70, easing: "ease-in-out" }
+                        { duration: 70, easing: "ease-in-out" },
                     )
                     resetAnimation.onfinish = function () {
                         cloned?.remove()
@@ -890,8 +892,8 @@ class WindowTabPlugin extends BasePlugin {
         storage.set({
             mount_folder: this.utils.getMountFolder(),
             save_tabs: this.tab.tabs.map((tab, idx) => ({
-                idx, path: tab.path, scrollTop: tab.scrollTop, active: idx === this.tab.activeIdx
-            }))
+                idx, path: tab.path, scrollTop: tab.scrollTop, active: idx === this.tab.activeIdx,
+            })),
         })
     }
 

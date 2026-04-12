@@ -1,4 +1,20 @@
 class TOCMarkmap {
+    mm = null
+    transformContext = null
+    pinUtils = {
+        isPinTop: false,
+        isPinRight: false,
+        originModalRect: null,
+        originContentRect: null,
+        recordContentRect: rect => this.pinUtils.originContentRect = rect,
+        recordRects: () => {
+            if (!this.entities.modal.classList.contains("pinned-window")) {
+                this.pinUtils.originModalRect = this.entities.modal.getBoundingClientRect()
+                this.pinUtils.originContentRect = this.entities.content.getBoundingClientRect()
+            }
+        },
+    }
+
     constructor(plugin) {
         this.plugin = plugin
         this.utils = plugin.utils
@@ -30,10 +46,6 @@ class TOCMarkmap {
 
     init = () => {
         this._fixConfig()
-
-        this.mm = null
-        this.transformContext = null
-
         this.entities = {
             content: this.utils.entities.eContent,
             modal: document.querySelector("#plugin-markmap"),
@@ -43,20 +55,6 @@ class TOCMarkmap {
             svg: document.querySelector("#plugin-markmap-svg"),
             resize: document.querySelector('.plugin-markmap-icon[action="resize"]'),
             fullScreen: document.querySelector('.plugin-markmap-icon[action="expand"]'),
-        }
-
-        this.pinUtils = {
-            isPinTop: false,
-            isPinRight: false,
-            originModalRect: null,
-            originContentRect: null,
-            recordContentRect: rect => this.pinUtils.originContentRect = rect,
-            recordRects: () => {
-                if (!this.entities.modal.classList.contains("pinned-window")) {
-                    this.pinUtils.originModalRect = this.entities.modal.getBoundingClientRect()
-                    this.pinUtils.originContentRect = this.entities.content.getBoundingClientRect()
-                }
-            },
         }
     }
 
@@ -437,7 +435,7 @@ class TOCMarkmap {
                         const settings = await this.utils.settings.readBase()
                         this.config = settings[fixedName]
                         this.utils.notification.show(this.i18n.t("success.restore"))
-                        await this.utils.formDialog.updateModal(op => {
+                        await this.utils.formDialog.refresh(op => {
                             op.schema = getSchema()
                             op.data = getData()
                         })

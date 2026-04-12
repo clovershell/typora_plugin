@@ -1,12 +1,10 @@
 class CollapseParagraphPlugin extends BasePlugin {
-    styleTemplate = () => true
+    HEADERS = ["H1", "H2", "H3", "H4", "H5", "H6"]
+    className = "plugin-collapsed-paragraph"
+    selector = `#write > [mdtype="heading"]`
+    staticActions = this.i18n.fillActions([{ act_value: "collapse_all" }, { act_value: "expand_all" }])
 
-    init = () => {
-        this.className = "plugin-collapsed-paragraph"
-        this.selector = `#write > [mdtype="heading"]`
-        this.HEADERS = ["H1", "H2", "H3", "H4", "H5", "H6"]
-        this.staticActions = this.i18n.fillActions([{ act_value: "collapse_all" }, { act_value: "expand_all" }])
-    }
+    styleTemplate = () => true
 
     process = () => {
         this.utils.settings.autoSave(this)
@@ -255,5 +253,5 @@ class CollapseParagraphPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: CollapseParagraphPlugin
+    plugin: CollapseParagraphPlugin,
 }

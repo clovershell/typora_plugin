@@ -1,4 +1,8 @@
 class PieMenuPlugin extends BasePlugin {
+    pinMenuClass = "pin-menu"
+    expandMenuClass = "expand-menu"
+    modifierKey = this.utils.modifierKey(this.config.MODIFIER_KEY)
+
     styleTemplate = () => true
 
     html = () => {
@@ -11,7 +15,7 @@ class PieMenuPlugin extends BasePlugin {
         const circles = [
             genCircle("solid", []),
             genCircle("inner", innerItems),
-            outerItems.length ? genCircle("outer", outerItems) : ""
+            outerItems.length ? genCircle("outer", outerItems) : "",
         ]
         return `<div class="plugin-pie-menu plugin-common-hidden">${circles.join("")}</div>`
     }
@@ -19,9 +23,6 @@ class PieMenuPlugin extends BasePlugin {
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
     init = () => {
-        this.pinMenuClass = "pin-menu"
-        this.expandMenuClass = "expand-menu"
-        this.modifierKey = this.utils.modifierKey(this.config.MODIFIER_KEY)
         this.entities = {
             content: this.utils.entities.eContent,
             menu: document.querySelector(".plugin-pie-menu"),
@@ -73,10 +74,9 @@ class PieMenuPlugin extends BasePlugin {
             }
 
             if (ev.button === 0) {
-                const target = ev.target.closest(".plugin-pie-menu-item[data-callback]")
-                const callback = target && target.dataset.callback
-                if (callback) {
-                    let [fixedName, action] = callback.split(".")
+                const cb = ev.target.closest(".plugin-pie-menu-item[data-callback]")?.dataset.callback
+                if (cb) {
+                    let [fixedName, action] = cb.split(".")
                     if (this.utils.getCustomPlugin(fixedName)) {
                         action = fixedName
                         fixedName = "custom"
@@ -92,9 +92,9 @@ class PieMenuPlugin extends BasePlugin {
         this.entities.menu.addEventListener("wheel", ev => {
             ev.preventDefault()
             const step = 22.5
-            const rotate = window.getComputedStyle(this.entities.menu).getPropertyValue('--menu-rotate') || 0
+            const rotate = window.getComputedStyle(this.entities.menu).getPropertyValue("--menu-rotate") || 0
             const rotateValue = parseFloat(rotate) + (ev.deltaY > 0 ? step : -step)
-            this.entities.menu.style.setProperty('--menu-rotate', `${rotateValue}deg`)
+            this.entities.menu.style.setProperty("--menu-rotate", `${rotateValue}deg`)
         }, { passive: false })
     }
 
@@ -102,5 +102,5 @@ class PieMenuPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: PieMenuPlugin
+    plugin: PieMenuPlugin,
 }

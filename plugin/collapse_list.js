@@ -4,12 +4,9 @@
  *  3. When the parent element detects a click, check the mouse position. If the mouse position is outside the parent element's Rect, then determine that the pseudo-class has been clicked
  */
 class CollapseListPlugin extends BasePlugin {
-    beforeProcess = () => {
-        this.className = "plugin-collapsed-list"
-        this.selector = '#write [mdtype="list"]'
-        const color = this.config.TRIANGLE_COLOR || "var(--meta-content-color)"
-        this.triangleStyle = { left: -18, top: 0, height: 9, halfWidth: 7, color: color }
-    }
+    className = "plugin-collapsed-list"
+    selector = '#write [mdtype="list"]'
+    triangleStyle = { left: -18, top: 0, height: 9, halfWidth: 7, color: this.config.TRIANGLE_COLOR || "var(--meta-content-color)" }
 
     styleTemplate = () => true
 

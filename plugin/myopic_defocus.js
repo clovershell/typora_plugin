@@ -1,8 +1,6 @@
 class MyopicDefocusPlugin extends BasePlugin {
-    init = () => {
-        this.myopicDefocus = new MyopicDefocus()
-        this.inDefocusMode = this.config.DEFOCUS_DEFAULT
-    }
+    myopicDefocus = new MyopicDefocus()
+    inDefocusMode = this.config.DEFOCUS_DEFAULT
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
@@ -35,25 +33,25 @@ class MyopicDefocusPlugin extends BasePlugin {
 }
 
 class MyopicDefocus {
-    static DEFAULT_CONFIG = {
-        screenSize: 14,  // inches
-        screenResolutionX: 2560,  // px
-        screenResolutionY: 1440,  // px
-        screenDistance: 40,  // cm
-        effectStrength: 10,  // percent
-        svgContainerId: "myopic-defocus-svg",
-        blurLayerId: "myopic-defocus-layer",
-    }
-    static LCA_CONSTANTS = {
+    blurLayer = null
+    svgContainer = null
+    LCA_CONSTANTS = {
         lca_nat_r: -0.23,
         lca_nat_g: 0.24,
         lca_nat_b: 1.10,
     }
 
     constructor(config = {}) {
-        this.config = { ...MyopicDefocus.DEFAULT_CONFIG, ...config }
-        this.blurLayer = null
-        this.svgContainer = null
+        this.config = {
+            screenSize: 14,  // inches
+            screenResolutionX: 2560,  // px
+            screenResolutionY: 1440,  // px
+            screenDistance: 40,  // cm
+            effectStrength: 10,  // percent
+            svgContainerId: "myopic-defocus-svg",
+            blurLayerId: "myopic-defocus-layer",
+            ...config,
+        }
     }
 
     applyEffect = (config = {}) => {
@@ -86,7 +84,7 @@ class MyopicDefocus {
 
         let pix = realWidthMm / screenResolutionX
 
-        const { lca_nat_r, lca_nat_g, lca_nat_b } = MyopicDefocus.LCA_CONSTANTS
+        const { lca_nat_r, lca_nat_g, lca_nat_b } = this.LCA_CONSTANTS
         const sh = -lca_nat_r
 
         const lca_rif_r = lca_nat_r + sh

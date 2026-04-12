@@ -1,5 +1,5 @@
 class EchartsPlugin extends BasePlugin {
-    init = () => this.echartsPkg = null
+    echartsPkg = null
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

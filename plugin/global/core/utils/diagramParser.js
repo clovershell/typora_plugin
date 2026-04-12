@@ -2,17 +2,17 @@
  * Dynamically register and unregister new code block diagram.
  */
 class DiagramParser {
+    enableMappingSym = Symbol("enable_mapping")
+    exitInteractiveStrategies = ["click_exit_button"]
+    PANEL = `<div class="md-diagram-panel md-fences-adv-panel"><div class="md-diagram-panel-header"></div><div class="md-diagram-panel-preview"></div><div class="md-diagram-panel-error"></div></div>`
+    parsers = new Map()     // map[lang]parser
+    langMapping = new Map() // map[lang]mappingLang
+    scheduled = new Set()   // cid
+    timeout = 300
+
     constructor(utils, i18n) {
         this.utils = utils
         this.i18n = i18n
-        this.enableMappingSym = Symbol("enable_mapping")
-        this.panel = `<div class="md-diagram-panel md-fences-adv-panel"><div class="md-diagram-panel-header"></div><div class="md-diagram-panel-preview"></div><div class="md-diagram-panel-error"></div></div>`
-        this.exitInteractiveStrategies = ["click_exit_button"]
-        this.parsers = new Map()     // map[lang]parser
-        this.langMapping = new Map() // map[lang]mappingLang
-
-        this.scheduled = new Set()     // cid
-        this.timeout = 300
     }
 
     /**
@@ -27,7 +27,7 @@ class DiagramParser {
      */
     register = ({
                     lang, mappingLang, destroyWhenUpdate = false,
-                    renderFunc, cancelFunc = null, destroyAllFunc = null, exportStyleGetter = null, interactiveMode = true
+                    renderFunc, cancelFunc = null, destroyAllFunc = null, exportStyleGetter = null, interactiveMode = true,
                 }) => {
         lang = lang.toLowerCase()
         mappingLang = mappingLang ? mappingLang.toLowerCase() : lang
@@ -132,7 +132,7 @@ class DiagramParser {
             return this.utils.escape(error.stack)
         }
         const { errorLine, reason } = error || {}
-        let msg = errorLine ? this.i18n.t("global", "error.atLine", { errorLine }) : ''
+        let msg = errorLine ? this.i18n.t("global", "error.atLine", { errorLine }) : ""
         if (reason instanceof Error) {
             msg += "\n" + this.utils.escape(reason.stack)
         } else if (reason) {
@@ -185,7 +185,7 @@ class DiagramParser {
 
     appendPanelIfNeed = $pre => {
         if ($pre.find(".md-diagram-panel").length === 0) {
-            $pre.append(this.panel)
+            $pre.append(this.PANEL)
         }
     }
 

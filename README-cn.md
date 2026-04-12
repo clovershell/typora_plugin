@@ -138,14 +138,17 @@ yay -S typora-plugin
 
 ## 插件使用说明
 
-所有的插件都提供了四种使用方法：
+所有的插件都提供了七种使用方法：
 
 - 键盘党：
   - 命令面板（`command_palette` 插件）
+  - 斜杆命令（`slash_commands` 插件）
   - 快捷键（`hotkeys` 插件）
 - 鼠标党：
   - 右键菜单（`right_click_menu` 插件）
+  - 鼠标手势（`mouse_gestures` 插件）
   - 悬浮按钮（`action_buttons` 插件）
+  - 圆盘菜单（`pie_menu` 插件）
 
 
 
@@ -157,22 +160,7 @@ yay -S typora-plugin
 
 ### search_multi
 
-搜索通过组合不同的条件来精确查找文件。
-
-
-使用示例：搜索语法类似于 Google 搜索语法，支持正则表达式。
-
-| 输入                                                | 搜索文件                                                     |
-| --------------------------------------------------- | ------------------------------------------------------------ |
-| `pear`                                              | 包含 pear                                                    |
-| `sour pear`                                         | 包含 sour 和 pear                                            |
-| `sour OR pear`                                      | 包含 sour 或 pear                                            |
-| `"sour pear"`                                       | 包含 sour pear 词组                                          |
-| `sour pear -apple`                                  | 包含 sour 和 pear，且不含 apple                              |
-| `/\bsour\b/ pear mtime=2024-03-12`                  | 匹配正则 \bsour\b，且包含 pear，且文件的修改时间为 2024-03-12 |
-| `frontmatter:开发 OR head=plugin OR strong:MIT`     | YAML Front Matter 包含开发 或者 标题内容为 plugin 或者 加粗文字包含 MIT |
-| `size>10kb (linenum>=1000 OR hasimage=true)`        | 文件大小超过 10KB，并且文件要么至少有 1000 行，要么包含图片  |
-| `thead:k8s h2:prometheus blockcode:"kubectl apply"` | 表头包含 k8s，且二级标题包含 prometheus，且代码块内容包含 kubectl apply |
+通过类似于 Google 搜索语法，组合不同的条件来精确查找文件。
 
 ![search_mutli](assets/search_mutli.gif)
 

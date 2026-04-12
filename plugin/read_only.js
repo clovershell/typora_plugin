@@ -1,10 +1,11 @@
 class ReadOnlyPlugin extends BasePlugin {
+    inReadOnlyMode = false
+
     styleTemplate = () => true
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
     process = () => {
-        this.inReadOnlyMode = false
         this.eventHandlers = this._buildEventHandlers()
         this.utils.eventHub.addEventListener(this.utils.eventHub.eventType.allPluginsHadInjected, () => {
             this.utils.decorator.afterCall(() => File, "freshLock", this._afterFreshLock)

@@ -1,5 +1,5 @@
 class CalendarPlugin extends BasePlugin {
-    init = () => this.Calendar = null
+    Calendar = null
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 

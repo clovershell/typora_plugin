@@ -1,7 +1,5 @@
 class HotkeyHub {
-    constructor() {
-        this.map = new Map()
-    }
+    map = new Map()
 
     normalize = hotkeyString => {
         const modifier = ["ctrl", "shift", "alt"]

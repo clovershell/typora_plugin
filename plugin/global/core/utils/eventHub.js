@@ -2,27 +2,28 @@
  * Dynamically register, unregister, and publish lifecycle events.
  */
 class EventHub {
+    observer = null
+    eventMap = Object.create(null)  // { eventType: { order: [listener] } }
+    eventType = Object.freeze({
+        allPluginsHadInjected: "allPluginsHadInjected",        // All plugins loaded
+        beforeFileOpen: "beforeFileOpen",                      // Before opening a file
+        fileOpened: "fileOpened",                              // After opening a file
+        otherFileOpened: "otherFileOpened",                    // Different from fileOpened: reopening the current tab won't trigger otherFileOpened, but fileOpened will
+        fileContentLoaded: "fileContentLoaded",                // After file content is loaded
+        fileEdited: "fileEdited",                              // After file is edited
+        beforeToggleSourceMode: "beforeToggleSourceMode",      // Before entering source code mode
+        afterToggleSidebar: "afterToggleSidebar",              // After toggling the sidebar state
+        afterSetSidebarWidth: "afterSetSidebarWidth",          // After adjusting the sidebar width
+        // contentElementResized: "contentElementResized",        // content element resized
+        beforeAddCodeBlock: "beforeAddCodeBlock",              // Before adding a code block
+        afterAddCodeBlock: "afterAddCodeBlock",                // After adding a code block
+        afterUpdateCodeBlockLang: "afterUpdateCodeBlockLang",  // After modifying the code block language
+        outlineUpdated: "outlineUpdated",                      // When the outline is updated
+        toggleSettingPage: "toggleSettingPage",                // When toggling to/from the settings page
+    })
+
     constructor(utils) {
         this.utils = utils
-        this.observer = null
-        this.eventMap = Object.create(null)  // { eventType: { order: [listener] } }
-        this.eventType = Object.freeze({
-            allPluginsHadInjected: "allPluginsHadInjected",             // All plugins loaded
-            beforeFileOpen: "beforeFileOpen",                           // Before opening a file
-            fileOpened: "fileOpened",                                   // After opening a file
-            otherFileOpened: "otherFileOpened",                         // Different from fileOpened: reopening the current tab won't trigger otherFileOpened, but fileOpened will
-            fileContentLoaded: "fileContentLoaded",                     // After file content is loaded
-            fileEdited: "fileEdited",                                   // After file is edited
-            beforeToggleSourceMode: "beforeToggleSourceMode",           // Before entering source code mode
-            afterToggleSidebar: "afterToggleSidebar",                   // After toggling the sidebar state
-            afterSetSidebarWidth: "afterSetSidebarWidth",               // After adjusting the sidebar width
-            // contentElementResized: "contentElementResized",             // content element resized
-            beforeAddCodeBlock: "beforeAddCodeBlock",                   // Before adding a code block
-            afterAddCodeBlock: "afterAddCodeBlock",                     // After adding a code block
-            afterUpdateCodeBlockLang: "afterUpdateCodeBlockLang",       // After modifying the code block language
-            outlineUpdated: "outlineUpdated",                           // When the outline is updated
-            toggleSettingPage: "toggleSettingPage",                     // When toggling to/from the settings page
-        })
     }
 
     addEventListener = (type, listener, order = 0) => {

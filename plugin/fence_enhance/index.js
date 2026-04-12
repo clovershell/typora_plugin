@@ -1,14 +1,12 @@
 class FenceEnhancePlugin extends BasePlugin {
+    buttons = []
+    supportIndent = this.config.ENABLE_INDENT && File.editor.fences?.formatContent
+    enableIndent = this.supportIndent
+
     styleTemplate = () => ({
         bgColorOnHover: this.config.HIGHLIGHT_ON_HOVER ? `.CodeMirror-line:hover { background-color: ${this.config.HIGHLIGHT_LINE_COLOR_ON_HOVER}; }` : "",
         bgColorOnFocus: this.config.HIGHLIGHT_ON_FOCUS ? `.md-focus .CodeMirror-activeline { background-color: ${this.config.HIGHLIGHT_LINE_COLOR_ON_FOCUS}; }` : "",
     })
-
-    init = () => {
-        this.supportIndent = this.config.ENABLE_INDENT && File.editor.fences?.formatContent
-        this.enableIndent = this.supportIndent
-        this.buttons = []
-    }
 
     process = async () => {
         this.utils.settings.autoSave(this)
@@ -541,13 +539,14 @@ const indentWrappedLine = ({ utils }) => {
 }
 
 class HighlightHelper {
+    className = "plugin-fence-enhance-highlight"
+    highlightSym = Symbol("highlight")
+    highlightHandlesSym = Symbol("highlight_handles")
+
     constructor(plugin) {
         this.utils = plugin.utils
         this.pattern = new RegExp(plugin.config.HIGHLIGHT_PATTERN)
         this.numberingBase = (plugin.config.NUMBERING_BASE === "0-based") ? 0 : 1
-        this.className = "plugin-fence-enhance-highlight"
-        this.highlightSym = Symbol("highlight")
-        this.highlightHandlesSym = Symbol("highlight_handles")
     }
 
     _setHighlight = (cm) => {
@@ -659,5 +658,5 @@ const foldLanguage = async ({ utils }) => {
 }
 
 module.exports = {
-    plugin: FenceEnhancePlugin
+    plugin: FenceEnhancePlugin,
 }

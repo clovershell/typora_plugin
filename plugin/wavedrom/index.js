@@ -31,11 +31,9 @@
  * Wavedrom's documentation is incomplete; source code inspection is often required.
  */
 class WavedromPlugin extends BasePlugin {
-    init = () => {
-        this.wavedromPkg = null
-        this.prefix = "WaveDrom_Display_"
-        this.evalFunc = this.config.SAFE_MODE ? this.utils.safeEval : this.utils.unsafeEval
-    }
+    wavedromPkg = null
+    PREFIX = "WaveDrom_Display_"
+    evalFunc = this.config.SAFE_MODE ? this.utils.safeEval : this.utils.unsafeEval
 
     hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
 
@@ -57,7 +55,7 @@ class WavedromPlugin extends BasePlugin {
                 align: { type: "string", enum: ["left", "center", "right"], valueAliases: { l: "left", c: "center", r: "right" }, default: this.config.CHART_ALIGN },
             },
             checkSelector: ".plugin-wavedrom-content",
-            wrapElement: () => `<div class="plugin-wavedrom-content" id="${this.prefix + ++idx}"></div>`,
+            wrapElement: () => `<div class="plugin-wavedrom-content" id="${this.PREFIX + ++idx}"></div>`,
             lazyLoadFunc: this.lazyLoad,
             beforeRenderFunc: null,
             renderStyleGetter: parser.helpers.renderStyle.wrapMeta(meta => ({ display: "flex", justifyContent: meta.align })),
@@ -73,10 +71,10 @@ class WavedromPlugin extends BasePlugin {
 
     create = ($wrap, content) => {
         const id = $wrap.attr("id")
-        const index = parseInt(id.slice(this.prefix.length))
+        const index = parseInt(id.slice(this.PREFIX.length))
         const waveJson = this.evalFunc(content)
         const notFirstSignal = false
-        this.wavedromPkg.renderWaveForm(index, waveJson, this.prefix, notFirstSignal)
+        this.wavedromPkg.renderWaveForm(index, waveJson, this.PREFIX, notFirstSignal)
     }
 
     getVersion = () => this.wavedromPkg?.version

@@ -5,9 +5,10 @@
  *              and then automatically fold the chapters back after the user switches back to maintain consistency.
  */
 class StateRecorder {
+    recorders = new Map()  // map[name]recorder
+
     constructor(utils) {
         this.utils = utils
-        this.recorders = new Map() // map[name]recorder
     }
 
     /**
@@ -20,9 +21,7 @@ class StateRecorder {
      * @param {function} options.finalFn: The function to execute last.
      * @param {function(Function)} options.delayFn: The function to delay execute.
      */
-    register = (options) => {
-        this.recorders.set(options.name, { ...options, collections: new Map() })
-    }
+    register = (options) => this.recorders.set(options.name, { ...options, collections: new Map() })
     unregister = recorderName => this.recorders.delete(recorderName)
 
     collect = name => {

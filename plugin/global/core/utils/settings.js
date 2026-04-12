@@ -1,7 +1,8 @@
 class Settings {
+    META = { $id: "https://github.com/obgnail/typora_plugin", $version: "1" }
+
     constructor(utils) {
         this.utils = utils
-        this.META = { $id: "https://github.com/obgnail/typora_plugin", $version: "1" }
     }
 
     getOriginPath = file => this.utils.joinPluginPath("./plugin/global/settings", file)
@@ -45,7 +46,7 @@ class Settings {
             set(target, property, value, receiver) {
                 save(plugin.fixedName, { [property]: value })
                 return Reflect.set(...arguments)
-            }
+            },
         })
     }
 

@@ -2,11 +2,12 @@
  * Dynamically register additional actions on export.
  */
 class ExportHelper {
+    htmlHelpers = new Map()
+    nativeHelpers = new Map()
+    isAsync = undefined
+
     constructor(utils) {
         this.utils = utils
-        this.htmlHelpers = new Map()
-        this.nativeHelpers = new Map()
-        this.isAsync = undefined
     }
 
     /**

@@ -1,10 +1,13 @@
 class SlashCommandsPlugin extends BasePlugin {
-    beforeProcess = () => {
-        this.SCOPE = { INLINE_MATH: "inline_math", PLAIN: "plain" }
-        this.TYPE = { COMMAND: "command", SNIPPET: "snippet", GENERATE_SNIPPET: "gen-snp" }
+    REGEX = new RegExp(this.config.TRIGGER_REGEXP)
+    SCOPE = { INLINE_MATH: "inline_math", PLAIN: "plain" }
+    TYPE = { COMMAND: "command", SNIPPET: "snippet", GENERATE_SNIPPET: "gen-snp" }
+    inputs = { kw: "", command: "", params: [], textBefore: "", textAfter: "", scope: "", bookmark: null }
+    matched = new Map()
 
+    beforeProcess = () => {
         const defaultOffset = [0, 0]
-        const { COMMANDS, TRIGGER_REGEXP, MATCH_STRATEGY, ORDER_STRATEGY } = this.config
+        const { COMMANDS, MATCH_STRATEGY, ORDER_STRATEGY } = this.config
         COMMANDS.forEach(c => {
             c.scope = c.scope || this.SCOPE.PLAIN
             c.icon = c.icon || (c.type === this.TYPE.COMMAND ? "🧰" : "🧩")
@@ -12,9 +15,6 @@ class SlashCommandsPlugin extends BasePlugin {
             c.hint = this.utils.escape(c.hint || "")
         })
 
-        this.inputs = { kw: "", command: "", params: [], textBefore: "", textAfter: "", scope: "", bookmark: null }
-        this.matched = new Map()
-        this.regexp = new RegExp(TRIGGER_REGEXP)
         this.matchStrategy = this._getMatchStrategy(MATCH_STRATEGY)
         this.orderStrategy = this._getOrderStrategy(ORDER_STRATEGY)
         this.commands = new Map(COMMANDS.filter(c => c.enable && c.keyword && /[A-Za-z0-9]+/.test(c.keyword)).map(c => [c.keyword.toLowerCase(), c]))
@@ -59,7 +59,7 @@ class SlashCommandsPlugin extends BasePlugin {
 
         const [textBefore, textAfter, bookmark, scope] = this._getTextAround()
         if (!textBefore) return
-        const match = textBefore.match(this.regexp)
+        const match = textBefore.match(this.REGEX)
         const kw = match?.groups?.kw
         if (kw == null) return
 
@@ -117,7 +117,7 @@ class SlashCommandsPlugin extends BasePlugin {
                     result.push(`<b>${hit.join("")}</b>`)
                 }
                 return result.join("")
-            }
+            },
         }
         return { prefix, substr, abbr }[type] || abbr
     }
@@ -246,5 +246,5 @@ class SlashCommandsPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: SlashCommandsPlugin
+    plugin: SlashCommandsPlugin,
 }

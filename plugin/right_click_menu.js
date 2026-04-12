@@ -1,18 +1,16 @@
 class RightClickMenuPlugin extends BasePlugin {
+    groupName = "typora-plugin"
+    noExtraMenuGroupName = "typora-plugin-no-extra"
+    dividerValue = "---"
+    unavailableActValue = "__not_available__"
+    unavailableActName = this.i18n.t("act.disabled")
+    defaultDisableHint = this.i18n.t("actHint.disabled")
+    supportShortcut = !!document.querySelector(".ty-menu-shortcut")
+
     styleTemplate = () => ({
         menu_min_width: this.config.MENU_MIN_WIDTH,
-        menu_option_display: this.config.HIDE_OTHER_OPTIONS ? "none" : ""
+        menu_option_display: this.config.HIDE_OTHER_OPTIONS ? "none" : "",
     })
-
-    init = () => {
-        this.groupName = "typora-plugin"
-        this.noExtraMenuGroupName = "typora-plugin-no-extra"
-        this.dividerValue = "---"
-        this.unavailableActValue = "__not_available__"
-        this.unavailableActName = this.i18n.t("act.disabled")
-        this.defaultDisableHint = this.i18n.t("actHint.disabled")
-        this.supportShortcut = !!document.querySelector(".ty-menu-shortcut")
-    }
 
     process = () => {
         this.utils.settings.autoSave(this)
@@ -33,13 +31,13 @@ class RightClickMenuPlugin extends BasePlugin {
             }
             const name = this.i18n._t("settings", NAME)
             const noExtraMenu = LIST.length === 1
-            const caret = noExtraMenu ? "" : '<i class="fa fa-caret-right"></i>'
+            const caret = noExtraMenu ? "" : `<i class="fa fa-caret-right"></i>`
             const a = `<a role="menuitem"><span data-lg="Menu" data-localize="${name}">${name}</span>${caret}</a>`
             return noExtraMenu
                 ? `<li data-key="${this.noExtraMenuGroupName}" data-value="${LIST[0]}" data-idx="${idx}">${a}</li>`
                 : `<li class="has-extra-menu" data-key="${this.groupName}" data-idx="${idx}">${a}</li>`
         })
-        const html = '<li class="divider"></li>' + items.join("")
+        const html = `<li class="divider"></li>` + items.join("")
         document.querySelector("#context-menu").insertAdjacentHTML("beforeend", html)
     }
 
@@ -55,8 +53,8 @@ class RightClickMenuPlugin extends BasePlugin {
         const LiWithAction = (plugin, action) => {
             const target = plugin.staticActions.find(act => act.act_value === action)
             const name = target ? target.act_name : plugin.pluginName
-            const children = [{ ele: "a", role: "menuitem", "data-lg": "Menu", "data-localize": name, text: name }]
-            return { ele: "li", className: "plugin-menu-item", "data-key": plugin.fixedName, "data-value": action, children }
+            const children = [{ el: "a", role: "menuitem", "data-lg": "Menu", "data-localize": name, text: name }]
+            return { el: "li", className: "plugin-menu-item", "data-key": plugin.fixedName, "data-value": action, children }
         }
         const Li = plugin => {
             const hasAction = plugin.staticActions || plugin.getDynamicActions
@@ -72,7 +70,7 @@ class RightClickMenuPlugin extends BasePlugin {
         const templates = this.config.MENUS.map(({ LIST = [] }, idx) => {
             const children = LIST.map(item => {
                 if (item === this.dividerValue) {
-                    return { ele: "li", className: "divider" }
+                    return { el: "li", className: "divider" }
                 }
                 const [fixedName, action] = item.split(".")
                 const plugin = this.utils.getBasePlugin(fixedName)
@@ -80,7 +78,7 @@ class RightClickMenuPlugin extends BasePlugin {
                     return action ? LiWithAction(plugin, action) : Li(plugin)
                 }
             }).filter(Boolean)
-            return { ele: "ul", role: "menu", "data-idx": idx, className, children }
+            return { el: "ul", role: "menu", "data-idx": idx, className, children }
         })
         this.utils.entities.eContent.append(...this._createElement(templates))
     }
@@ -94,7 +92,7 @@ class RightClickMenuPlugin extends BasePlugin {
                 .filter(plugin => plugin && (plugin.staticActions || plugin.getDynamicActions))
                 .map(plugin => {
                     const children = (plugin.staticActions || []).map(act => this._thirdLiTemplate(act))
-                    return { ele: "ul", role: "menu", "data-idx": idx, "data-plugin": plugin.fixedName, className, children }
+                    return { el: "ul", role: "menu", "data-idx": idx, "data-plugin": plugin.fixedName, className, children }
                 })
         })
         this.utils.entities.eContent.append(...this._createElement(templates))
@@ -105,15 +103,10 @@ class RightClickMenuPlugin extends BasePlugin {
             act.act_hint = this.defaultDisableHint
         }
         const classList = ["plugin-menu-item"]
-        if (dynamic) {
-            classList.push("plugin-dynamic-act")
-        }
-        if (act.act_hidden) {
-            classList.push("plugin-common-hidden")
-        }
-        if (act.act_disabled) {
-            classList.push("disabled")
-        }
+        if (dynamic) classList.push("plugin-dynamic-act")
+        if (act.act_hidden) classList.push("plugin-common-hidden")
+        if (act.act_disabled) classList.push("disabled")
+
         const extra = { "ty-hint": act.act_hint || undefined, className: classList.join(" ") }
         const state = (this.config.SHOW_ACTION_OPTIONS_ICON && act.act_state === undefined)
             ? "state-run"
@@ -127,12 +120,12 @@ class RightClickMenuPlugin extends BasePlugin {
         shortcut = this._cleanShortcut(shortcut)
         const hasShortcut = this.supportShortcut && this.config.SHOW_PLUGIN_HOTKEY && shortcut
         const attr = hasExtraMenu
-            ? { children: [{ ele: "span", "data-lg": "Menu", "data-localize": showName, text: showName, children: [{ ele: "i", className: "fa fa-caret-right" }] }] }
+            ? { children: [{ el: "span", "data-lg": "Menu", "data-localize": showName, text: showName, children: [{ el: "i", className: "fa fa-caret-right" }] }] }
             : hasShortcut
-                ? { children: [{ ele: "span", "data-localize": showName, text: showName }, { ele: "span", className: "ty-menu-shortcut", text: shortcut }] }
+                ? { children: [{ el: "span", "data-localize": showName, text: showName }, { el: "span", className: "ty-menu-shortcut", text: shortcut }] }
                 : { text: showName, "data-localize": showName }
-        const children = [{ ele: "a", role: "menuitem", className, "data-lg": "Menu", ...attr }]
-        return { ele: "li", "data-key": key, children, ...extra }
+        const children = [{ el: "a", role: "menuitem", className, "data-lg": "Menu", ...attr }]
+        return { el: "li", "data-key": key, children, ...extra }
     }
 
     _cleanShortcut = shortcut => {
@@ -148,11 +141,11 @@ class RightClickMenuPlugin extends BasePlugin {
 
     _createElement = templates => {
         return templates.filter(Boolean).map(tpl => {
-            const el = document.createElement(tpl.ele || "div")
+            const el = document.createElement(tpl.el || "div")
             for (const [prop, value] of Object.entries(tpl)) {
                 if (value == null) continue
                 switch (prop) {
-                    case "ele":
+                    case "el":
                         break
                     case "className":
                         el.classList.add(...value.trim().split(/\s+/g))
@@ -193,8 +186,8 @@ class RightClickMenuPlugin extends BasePlugin {
 
     listen = () => {
         const that = this
-        const removeShow = ele => ele.classList.remove("show")
-        const removeActive = ele => ele.classList.remove("active")
+        const removeShow = el => el.classList.remove("show")
+        const removeActive = el => el.classList.remove("active")
 
         // Click on the first level menu
         $("#context-menu").on("click", `[data-key="${this.noExtraMenuGroupName}"]`, function () {
@@ -238,7 +231,7 @@ class RightClickMenuPlugin extends BasePlugin {
                 const templates = dynamicActions.map(act => that._thirdLiTemplate(act, true))
                 third.append(...that._createElement(templates)) // appendThirdLi
             }
-            if (this.querySelector('span[data-lg="Menu"]')) {
+            if (this.querySelector(`span[data-lg="Menu"]`)) {
                 that.showMenuItem(third, this)
             } else {
                 removeActive(document.querySelector(".plugin-menu-second .has-extra-menu"))
@@ -316,5 +309,5 @@ class RightClickMenuPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: RightClickMenuPlugin
+    plugin: RightClickMenuPlugin,
 }

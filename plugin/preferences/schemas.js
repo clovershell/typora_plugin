@@ -387,7 +387,7 @@ const DEPS = {
     fenceEnhanceButton: { dependencies: Dep.true("ENABLE_BUTTON") },
     fenceEnhanceHotkey: { dependencies: Dep.true("ENABLE_HOTKEY") },
     countFile: { dependencies: Dep.true("ENABLE_FILE_COUNT") },
-    gesturesDisplay: (btn) => ({ dependencies: Dep.and(Dep.or(Dep.true("SHOW_VISUALIZER"), Dep.true("SHOW_GESTURE_HUD")), Dep.contains("TRIGGER_BUTTONS", btn)) }),
+    gesturesDisplay: (btn) => ({ dependencies: Dep.and(Dep.or(Dep.true("ENABLE_VISUALIZER"), Dep.true("ENABLE_HUD")), Dep.contains("TRIGGER_BUTTONS", btn)) }),
 }
 
 const FIELDS = {
@@ -1248,12 +1248,11 @@ const schema_custom = [
 const schema_mouse_gestures = [
     BOXES.pluginLite,
     UntitledBox(
-        Switch("SHOW_GESTURE_HUD"),
-        Switch("SHOW_VISUALIZER"),
-        Integer("TRAJECTORY_LINE_WIDTH", { unit: UNITS.pixel, min: 1, dependencies: Dep.true("SHOW_VISUALIZER") }),
-    ),
-    UntitledBox(
+        Switch("ENABLE_HUD"),
+        Switch("ENABLE_VISUALIZER"),
+        Switch("ENABLE_SENSORY"),
         Select("TRIGGER_BUTTONS", OPTS.mouse_gestures.TRIGGER_BUTTONS, { minItems: 1 }),
+        Integer("TRAJECTORY_LINE_WIDTH", { unit: UNITS.pixel, min: 1, dependencies: Dep.true("ENABLE_VISUALIZER") }),
         Color("DEFAULT_COLOR.middle", DEPS.gesturesDisplay("middle")),
         Color("DEFAULT_COLOR.right", DEPS.gesturesDisplay("right")),
         Color("DEFAULT_COLOR.x1", DEPS.gesturesDisplay("x1")),
@@ -1261,7 +1260,7 @@ const schema_mouse_gestures = [
     ),
     TableBox(
         "GESTURES",
-        ["path", "name"],
+        ["path", "button", "name"],
         [
             UntitledBox(
                 Switch("enable"),
@@ -1290,6 +1289,7 @@ const schema_mouse_gestures = [
         Integer("COOLDOWN", { unit: UNITS.millisecond, min: 0, tooltip: "COOLDOWN" }),
         Integer("MACRO_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "MACRO_RADIUS" }),
         Integer("TAIL_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "TAIL_RADIUS" }),
+        Integer("HYSTERESIS", { unit: UNITS.degree, min: 0, max: 45, tooltip: "HYSTERESIS" }),
     ),
     BOXES.settingHandler,
 ]
@@ -1670,7 +1670,6 @@ const schema_kanban = [
         Float("KANBAN_TASK_DESC_MAX_HEIGHT", { tooltip: "minusOneMeansShowAll", unit: UNITS.em, min: -1 }),
         Switch("HIDE_DESC_WHEN_EMPTY"),
         Switch("WRAP"),
-        Switch("CTRL_WHEEL_TO_SWITCH"),
         Switch("ALLOW_MARKDOWN_INLINE_STYLE"),
         Palette("KANBAN_COLOR"),
         Palette("TASK_COLOR"),
