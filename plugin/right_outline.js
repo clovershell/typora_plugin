@@ -286,7 +286,7 @@ class RightOutlinePlugin extends BasePlugin {
         targetNode.classList.add("active")
     }
 
-    _getRoot = type => (type === "header") ? this.utils.getTocTree(this.config.remove_header_styles) : this._getKindRoot([type])
+    _getRoot = type => (type === "header") ? this.utils.getTocTree(this.config.REMOVE_HEADER_STYLES) : this._getKindRoot([type])
 
     _getKindRoot = types => {
         const includeHeadings = types.some(type => this.config.INCLUDE_HEADINGS[type])
