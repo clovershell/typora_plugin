@@ -113,6 +113,7 @@
     font-size: 14px;
     color: var(--ff-text-main);
     font-family: var(--ff-font-family);
+    -webkit-font-smoothing: antialiased;
 }
 
 #form ::-webkit-scrollbar {
@@ -278,10 +279,9 @@ textarea:disabled::selection,
 }
 
 .title {
-    /*display: flex;*/
-    /*align-items: center;*/
-    height: 42px;
-    line-height: 42px;
+    display: flex;
+    align-items: center;
+    min-height: 42px;
     font-weight: bold;
     user-select: none;
     color: var(--ff-text-main);
@@ -289,28 +289,26 @@ textarea:disabled::selection,
 
 #form.feature-collapsible-box .box-container > .title {
     cursor: pointer;
-    position: relative;
-    padding-left: 20px;
     user-select: none;
 }
 
 #form.feature-collapsible-box .box-container > .title::before {
     content: '';
-    position: absolute;
-    left: 4px;
-    top: 50%;
+    display: block;
+    flex-shrink: 0;
     width: 6px;
     height: 6px;
+    margin-right: 10px;
     border: 2px solid var(--ff-text-sub);
     border-top: 0;
     border-left: 0;
-    transform: translateY(-65%) rotate(45deg);
+    transform: rotate(45deg);
     transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     border-radius: 1px;
 }
 
 #form.feature-collapsible-box .box-container.collapsed > .title::before {
-    transform: translateY(-50%) rotate(-45deg);
+    transform: rotate(-45deg);
 }
 
 #form.feature-collapsible-box .box-container.collapsed > .box {
@@ -661,10 +659,12 @@ textarea:disabled {
     flex-direction: row-reverse;
     justify-content: space-between;
     align-items: center;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 0;
+    bottom: 0;
     right: 0;
-    margin: 0 5px;
+    height: fit-content;
+    margin: auto;
+    padding: 0 5px;
 }
 
 .hotkey-reset {
@@ -1624,9 +1624,6 @@ textarea:disabled {
     position: relative;
     max-width: 100%;
     line-height: 1.4;
-
-    will-change: transform;
-    transform: translateZ(0);
 }
 
 .transfer-card:last-child {
@@ -1989,7 +1986,7 @@ textarea:disabled {
 
 .custom-wrap th,
 .custom-wrap td {
-    padding: .65em 2px .65em 2px;
+    padding: 8px 2px;
     color: var(--ff-text-main);
 }
 
