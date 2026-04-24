@@ -122,6 +122,14 @@ class TabManager {
         this.switch(idx)
     }
 
+    first() {
+        this.switch(0)
+    }
+
+    last() {
+        this.switch(this.maxIdx)
+    }
+
     close(idx) {
         if (this.count <= 1) {
             return this._handleCloseLastTab(idx)

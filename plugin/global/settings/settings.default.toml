@@ -118,13 +118,13 @@ REOPEN_TABS_ON_STARTUP = false
 
 # =========== [ Hotkeys ] ===========
 # Close current tab
-CLOSE_HOTKEY = ["ctrl+w"]
+CLOSE_HOTKEY = ["Ctrl+W"]
 # Switch to next tab
-SWITCH_NEXT_TAB_HOTKEY = ["ctrl+PageDown", "ctrl+Tab"]
+SWITCH_NEXT_TAB_HOTKEY = ["Ctrl+PageDown", "Ctrl+Tab"]
 # Switch to previous tab
-SWITCH_PREVIOUS_TAB_HOTKEY = ["ctrl+PageUp", "ctrl+shift+Tab"]
+SWITCH_PREVIOUS_TAB_HOTKEY = ["Ctrl+PageUp", "Ctrl+Shift+Tab"]
 # Switch to last active tab
-SWITCH_LAST_ACTIVE_TAB_HOTKEY = ["ctrl+`"]
+SWITCH_LAST_ACTIVE_TAB_HOTKEY = ["Ctrl+`"]
 # Sort tabs by filename
 SORT_TABS_HOTKEY = []
 # Temporarily show/hide tab bar
@@ -1802,13 +1802,19 @@ ENABLE_VISUALIZER = true
 
 # Trajectory line width (px)
 # Requires ENABLE_VISUALIZER = true
-TRAJECTORY_LINE_WIDTH = 5
+TRAJECTORY_LINE_WIDTH = 4
 
 # Head-Up Display: Real time display of recognized paths and matching commands during a gesture movement
 ENABLE_HUD = true
 
 # Enable sensory feedback
 ENABLE_SENSORY = false
+
+# Allowed Pointer Types (Input Device)
+#   mouse: Mouse
+#   pen  : Stylus Pen
+#   touch: Touch Screen
+POINTER_TYPES = ["mouse"]
 
 # Trigger Mouse Buttons: Mouse buttons that support triggering gestures. Modifying is not recommended
 #   middle: Middle Button
@@ -1832,9 +1838,13 @@ GESTURES = [
   { enable = true, button = "x1", path = "→", name = "Latest Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.switchToLastActive()" },
   { enable = true, button = "right", path = "→", name = "Next Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.next()" },
   { enable = true, button = "right", path = "←", name = "Previous Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.previous()" },
+  { enable = true, button = "right", path = "→←", name = "First Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.first()" },
+  { enable = true, button = "right", path = "←→", name = "Last Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.last()" },
   { enable = true, button = "right", path = "↓→", name = "Close Tab", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.tab?.closeActive()" },
   { enable = true, button = "right", path = "→↓→", name = "Open In Finder", cooldown = 0, execute = "() => this.utils.showInFinder(this.utils.getBasePlugin('window_tab')?.tab?.current?.path)" },
   { enable = true, button = "right", path = "↑→↓", name = "Toggle Tab Bar", cooldown = 0, execute = "() => this.utils.getBasePlugin('window_tab')?.forceToggleTabBar()" },
+  { enable = true, button = "right", path = "↗", name = "Maximize Window", cooldown = 0, execute = "() => JSBridge.invoke('window.maximize')" },
+  { enable = true, button = "right", path = "↙", name = "Minimize Window", cooldown = 0, execute = "() => JSBridge.invoke('window.minimize')" },
   { enable = true, button = "right", path = "↓←", name = "Exit Typora", cooldown = 0, execute = "() => this.utils.exitTypora()" },
   { enable = true, button = "right", path = "↑↓", name = "Go to Bottom", cooldown = 0, execute = "() => this.utils.jumpToEdge(false)" },
   { enable = true, button = "right", path = "↓↑", name = "Go to Top", cooldown = 0, execute = "() => this.utils.jumpToEdge(true)" },
@@ -3216,11 +3226,8 @@ CALLOUTS = [
 ]
 
 # Default Options: Fallback styles for unknown callout blocks not belonging to the presets above
-# Default Background Color
 DEFAULT_BACKGROUND_COLOR = "#FAFAFA"
-# Default Left Line Color
 DEFAULT_LEFT_LINE_COLOR = "#777777"
-# Default Icon
 DEFAULT_ICON = "\\f075"
 
 # =========== [ Template ] ===========

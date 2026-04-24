@@ -376,7 +376,7 @@ const TITLES = {
 
 /******** Common ********/
 const PROPS = {
-    percent: { min: 0, max: 100, step: 1 },
+    percent: { min: 1, max: 100, step: 1 },
     protected: { tooltip: Tip.action("openSettingsFolder", "fa fa-gear", "protected"), disabled: true },
     minusOne: { tooltip: "minusOneMeansUnlimited", min: -1 },
 }
@@ -476,9 +476,10 @@ const OPTS = createOptions({
         TRAVERSE_STRATEGY: ["bfs", "dfs"],
     },
     mouse_gestures: {
-        STRATEGY: ["fourWay", "eightWay", "adaptive"],
+        POINTER_TYPES: ["mouse", "pen", "touch"],
         TRIGGER_BUTTONS: ["middle", "right", "x1", "x2"],
         SUPPRESSION_KEY: ["", "alt", "ctrl", "shift", "meta"],
+        STRATEGY: ["fourWay", "eightWay", "adaptive"],
         "GESTURES.button": ["", "middle", "right", "x1", "x2"],
     },
     slash_commands: {
@@ -539,17 +540,10 @@ const schema_global = [
         Select("EXIT_CHART_INTERACTION", OPTS.global.EXIT_CHART_INTERACTION, { minItems: 1 }),
     ),
     UntitledBox(
-        Action("inspectRuntimeSettings", {
-            tooltip: [
-                Tip.action("inspectDefaultSettings", "fa fa-codepen"),
-                Tip.action("inspectAllDefaultSettings", "fa fa-codepen"),
-                Tip.action("openSettingsDefaultTomlExternally", "fa fa-external-link-square"),
-                Tip.action("openSettingsUserTomlExternally", "fa fa-external-link-square"),
-            ],
-        }),
+        Action("inspectRuntimeSettings", { tooltip: [Tip.action("inspectDefaultSettings", "fa fa-codepen"), Tip.action("inspectAllDefaultSettings", "fa fa-codepen")] }),
         FIELDS.restoreSettings,
         Action("restoreAllSettings"),
-        Action("exportSettings"),
+        Action("exportSettings", { tooltip: [Tip.action("openSettingsDefaultTomlExternally", "fa fa-external-link-square"), Tip.action("openSettingsUserTomlExternally", "fa fa-external-link-square")] }),
         Action("importSettings"),
     ),
     UntitledBox(
@@ -1248,10 +1242,17 @@ const schema_custom = [
 const schema_mouse_gestures = [
     BOXES.pluginLite,
     UntitledBox(
-        Switch("ENABLE_HUD"),
-        Switch("ENABLE_VISUALIZER"),
-        Switch("ENABLE_SENSORY"),
+        Select("POINTER_TYPES", OPTS.mouse_gestures.POINTER_TYPES, { minItems: 1 }),
         Select("TRIGGER_BUTTONS", OPTS.mouse_gestures.TRIGGER_BUTTONS, { minItems: 1 }),
+        Select("SUPPRESSION_KEY", OPTS.mouse_gestures.SUPPRESSION_KEY),
+        Integer("START_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "START_TIMEOUT" }),
+        Integer("IDLE_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "IDLE_TIMEOUT" }),
+        Integer("COOLDOWN", { unit: UNITS.millisecond, min: 0, tooltip: "COOLDOWN" }),
+    ),
+    UntitledBox(
+        Switch("ENABLE_VISUALIZER"),
+        Switch("ENABLE_HUD"),
+        Switch("ENABLE_SENSORY"),
         Integer("TRAJECTORY_LINE_WIDTH", { unit: UNITS.pixel, min: 1, dependencies: Dep.true("ENABLE_VISUALIZER") }),
         Color("DEFAULT_COLOR.middle", DEPS.gesturesDisplay("middle")),
         Color("DEFAULT_COLOR.right", DEPS.gesturesDisplay("right")),
@@ -1283,10 +1284,6 @@ const schema_mouse_gestures = [
     TitledBox(
         TITLES.advanced,
         Select("STRATEGY", OPTS.mouse_gestures.STRATEGY, { tooltip: "STRATEGY" }),
-        Select("SUPPRESSION_KEY", OPTS.mouse_gestures.SUPPRESSION_KEY),
-        Integer("START_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "START_TIMEOUT" }),
-        Integer("IDLE_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "IDLE_TIMEOUT" }),
-        Integer("COOLDOWN", { unit: UNITS.millisecond, min: 0, tooltip: "COOLDOWN" }),
         Integer("MACRO_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "MACRO_RADIUS" }),
         Integer("TAIL_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "TAIL_RADIUS" }),
         Integer("HYSTERESIS", { unit: UNITS.degree, min: 0, max: 45, tooltip: "HYSTERESIS" }),

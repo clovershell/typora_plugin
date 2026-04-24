@@ -71,7 +71,7 @@ class SlashCommandsPlugin extends BasePlugin {
 
         this.inputs = { kw, command, params, textBefore, textAfter, scope, bookmark }
 
-        bookmark.start -= (kw.length + 1)
+        bookmark.start -= match[0].length
         File.editor.autoComplete.attachToRange()
         File.editor.autoComplete.show([], bookmark, lowerCommand, this.handler)
     }

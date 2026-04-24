@@ -998,9 +998,19 @@ const Feature_Highlight = {
 }
 
 /**
- * Uses PascalCase for chainable setters (e.g., `.Label()`) to prevent namespace collisions with the underlying camelCase data properties (e.g., `.label`).
+ * Provides a contextual, dual-state UI Builder architecture.
+ * It uses PascalCase for chainable setters to prevent namespace collisions with the underlying camelCase data properties.
  * This hybrid design allows the builder instance to serve directly as the final data object,
- * enabling native `JSON.stringify` serialization without a `.build()` step and ensuring a clean, transparent debugging experience.
+ * enabling native `JSON.stringify` serialization without an explicit `.build()` step.
+ *
+ * Contextual Resolution: `asBox` vs. `asField`
+ * UI controls adapt their data structure based on their placement within the schema:
+ * - `asBox`: Triggered when a control acts as a top-level layout node. It retains its outer container (Box) to manage layout-level attributes like `col` (grid span) and `title`.
+ * - `asField`: Triggered when a control is embedded inside a composite container (e.g., Groups, Tabs). The outer Box wrapper is stripped, yielding a pure, inner Field object.
+ *
+ * Property Lifecycle: `assign` & `transfer`
+ * - `assign` (Immediate Mutation): Invoked instantly when a chainable method is called. It assigns the property to either the outer Box or the inner Field depending on the strategy.
+ * - `transfer` (Contextual Injection): Invoked exclusively during `asField` resolution. It migrates layout properties (e.g., `title`, `col`) that were originally assigned to the outer Box down into the inner Field (as `label`, `col`), ensuring configurations are perfectly preserved even after the layout wrapper is discarded.
  */
 const Feature_DSLEngine = (() => {
     const RESOLVE_SYM = Symbol("schema:resolve")
@@ -1019,7 +1029,7 @@ const Feature_DSLEngine = (() => {
             return prop in target
                 ? target[prop]
                 : (key, val) => ({ [key]: { [`$${prop}`]: val } })
-        }
+        },
     })
     const Tip = {
         info: (text) => text,
@@ -1045,51 +1055,61 @@ const Feature_DSLEngine = (() => {
         if (combined.length === 1) return combined[0]
         return { $and: combined }
     }
-    const resolve = (input) => {
-        if (input == null) return input
-        if (input[RESOLVE_SYM]) {
-            return resolve(input[RESOLVE_SYM]())
+    const createResolver = (strategy) => {
+        const resolver = (input) => {
+            if (input == null) return []
+            if (input[RESOLVE_SYM]) {
+                const result = input[RESOLVE_SYM][strategy]?.call(input)
+                if (result == null) return []
+                return Array.isArray(result) ? result.flatMap(resolver) : [result]
+            }
+            if (Array.isArray(input)) {
+                return input.flatMap(resolver)
+            }
+            return [input]
         }
-        if (Array.isArray(input)) {
-            return input.flatMap(resolve)
-        }
-        return input
+        return resolver
     }
+
+    const resolveFields = createResolver("asField")
+    const resolveBoxes = createResolver("asBox")
+
     const normalizeBoxes = (boxes) => {
-        return [boxes].flat(Infinity).reduce((acc, box) => {
+        return resolveBoxes([boxes].flat(Infinity)).reduce((acc, box) => {
             if (box && typeof box === "object") {
-                const fields = Array.isArray(box.fields) ? box.fields.filter(field => field && typeof field === "object") : []
+                const rawFields = Array.isArray(box.fields) ? box.fields : []
+                const fields = resolveFields(rawFields).filter(field => field && typeof field === "object")
                 acc.push({ ...box, fields })
             }
             return acc
         }, [])
     }
-    const applyFields = (box, items) => {
+    const appendFields = (box, items) => {
         if (!items || items.length === 0) return
         if (!box.fields) box.fields = []
-        box.fields.push(...resolve(items))
+        box.fields.push(...resolveFields(items))
     }
 
     const PropResolvers = {
         FIELD: {
-            stage: (box, innerField, propKey, propVal) => innerField[propKey] = propVal,
-            commit: null,
+            assign: (box, innerField, propKey, propVal) => innerField[propKey] = propVal,
+            transfer: null,
         },
         BOX: {
-            stage: (box, innerField, propKey, propVal) => box[propKey] = propVal,
-            commit: null,
+            assign: (box, innerField, propKey, propVal) => box[propKey] = propVal,
+            transfer: null,
         },
         SHARED: {
-            stage: (box, innerField, propKey, propVal) => box[propKey] = propVal,
-            commit: (box, innerField, propKey) => {
+            assign: (box, innerField, propKey, propVal) => box[propKey] = propVal,
+            transfer: (box, innerField, propKey) => {
                 if (box[propKey] !== undefined) {  // `null` is allowed
                     innerField[propKey] = box[propKey]
                 }
             },
         },
         TITLE_LABEL: {
-            stage: (box, innerField, propKey, propVal) => box.title = propVal,
-            commit: (box, innerField) => {
+            assign: (box, innerField, propKey, propVal) => box.title = propVal,
+            transfer: (box, innerField) => {
                 if (box.title != null) {
                     innerField.label = box.title
                 }
@@ -1097,45 +1117,44 @@ const Feature_DSLEngine = (() => {
         },
         /** Sets the unit value and implicitly upgrades the field type from 'number' to 'unit'. This enables suffix rendering without requiring an explicit control change. */
         UNIT_CONVERTER: {
-            stage: (box, innerField, propKey, propVal) => {
+            assign: (box, innerField, propKey, propVal) => {
                 innerField[propKey] = propVal
                 if (innerField.type === "number") {
                     innerField.type = "unit"
                 }
             },
-            commit: null,
+            transfer: null,
         },
         DEPENDENCY: {
-            stage: (box, innerField, propKey, ...deps) => {
+            assign: (box, innerField, propKey, ...deps) => {
                 const [keyOrDep, value] = deps
                 const newDep = (value != null) ? Dep.eq(keyOrDep, value)
-                    : (typeof keyOrDep === "string") ? Dep.true(keyOrDep)
-                        : keyOrDep
+                    : (typeof keyOrDep === "string") ? Dep.true(keyOrDep) : keyOrDep
                 box.dependencies = mergeDeps(box.dependencies, newDep)
             },
-            commit: (box, innerField) => {
+            transfer: (box, innerField) => {
                 if (box.dependencies != null) {
                     innerField.dependencies = mergeDeps(innerField.dependencies, box.dependencies)
                 }
             },
         },
         FIELDS: {
-            stage: (box, innerField, propKey, ...fields) => applyFields(box, fields),
-            commit: null,
+            assign: (box, innerField, propKey, ...fields) => appendFields(box, fields),
+            transfer: null,
         },
         SCHEMA: {
-            stage: (box, innerField, propKey, ...boxes) => innerField[propKey] = normalizeBoxes(boxes),
-            commit: null,
+            assign: (box, innerField, propKey, ...boxes) => innerField[propKey] = normalizeBoxes(boxes),
+            transfer: null,
         },
         TABS: {
-            stage: (box, innerField, propKey, tabsConfig) => {
+            assign: (box, innerField, propKey, tabsConfig) => {
                 if (!Array.isArray(tabsConfig)) return
                 innerField[propKey] = tabsConfig.map(tab => tab.schema ? { ...tab, schema: normalizeBoxes(tab.schema) } : { ...tab })
             },
-            commit: null,
+            transfer: null,
         },
         TAB_APPEND: {
-            stage: (box, innerField, propKey, tabConfig) => {
+            assign: (box, innerField, propKey, tabConfig) => {
                 const tab = { ...tabConfig }
                 if (tab.schema) {
                     tab.schema = normalizeBoxes(tab.schema)
@@ -1143,8 +1162,8 @@ const Feature_DSLEngine = (() => {
                 if (!innerField.tabs) innerField.tabs = []
                 innerField.tabs.push(tab)
             },
-            commit: null,
-        }
+            transfer: null,
+        },
     }
     const BaseSpecs = {
         FIELD: {
@@ -1172,30 +1191,42 @@ const Feature_DSLEngine = (() => {
             children: PropResolvers.FIELDS,  // Alias for `fields`
             dependencies: PropResolvers.DEPENDENCY,
             showIf: PropResolvers.DEPENDENCY,  // Alias for `dependencies`
-        }
+        },
     }
     const BuilderFactory = {
         FIELD: {
             createSetter: (propKey, propResolver) => function (...args) {
-                propResolver.stage(this, this.fields[0], propKey, ...args)
+                propResolver.assign(this, this.fields[0], propKey, ...args)
                 return this
             },
-            createResolver: (specs) => function () {
-                const inner = { ...this.fields[0] }
-                for (const [key, propResolver] of Object.entries(specs)) {
-                    propResolver.commit?.(this, inner, key)
+            createResolver: (specs) => ({
+                asField() {
+                    const inner = { ...this.fields[0] }
+                    for (const [key, propResolver] of Object.entries(specs)) {
+                        propResolver.transfer?.(this, inner, key)
+                    }
+                    return inner
+                },
+                asBox() {
+                    const box = { ...this }
+                    box.fields = [{ ...this.fields[0] }]
+                    return box
                 }
-                return inner
-            },
+            }),
         },
         BOX: {
             createSetter: (propKey, propResolver) => function (...args) {
-                propResolver.stage(this, null, propKey, ...args)
+                propResolver.assign(this, null, propKey, ...args)
                 return this
             },
-            createResolver: () => function () {
-                return this
-            },
+            createResolver: () => ({
+                asField() {
+                    return null
+                },
+                asBox() {
+                    return { ...this }
+                }
+            }),
         },
         PRESET: {
             createSetter: (handler) => function (...args) {
@@ -1208,60 +1239,86 @@ const Feature_DSLEngine = (() => {
     return {
         onConstruct: (form) => {
             form.dslEngine = () => {
-                const scopedPresetMap = new Map()
-                const preset = (name, handler) => scopedPresetMap.set(name, handler)
-                const buildProto = (specs, factory) => {
-                    const presetMethods = [...scopedPresetMap].map(([name, handler]) => [name, BuilderFactory.PRESET.createSetter(handler)])
-                    const propMethods = Object.entries(specs).map(([propKey, propResolver]) => [capitalize(propKey), factory.createSetter(propKey, propResolver)])
-                    return {
-                        ...Object.fromEntries(presetMethods),
-                        ...Object.fromEntries(propMethods),
-                        [RESOLVE_SYM]: factory.createResolver(specs),
+                const scopedProto = { box: null, fields: Object.create(null), any: Object.create(null) }
+                const validatePresetName = (name, targetProto) => {
+                    if (!name || typeof name !== "string") {
+                        throw new TypeError(`[DSLEngine] Preset name must be a non-empty string.`)
+                    }
+                    const isReserved = Object.keys(BaseSpecs.FIELD).some(k => capitalize(k) === name)
+                        || Object.keys(BaseSpecs.BOX).some(k => capitalize(k) === name)
+                    if (isReserved) {
+                        throw new Error(`[DSLEngine] Preset collision: "${name}" is a reserved standard DSL property.`)
+                    }
+                    if (targetProto && Object.hasOwn(targetProto, name)) {
+                        throw new Error(`[DSLEngine] Preset collision: "${name}" is already registered in this sandbox.`)
                     }
                 }
-                const applyProps = (box, innerField, props, specs) => {
-                    for (const prop of Object.keys(props)) {
+                const preset = (name, handler) => {
+                    validatePresetName(name, scopedProto.any)
+                    scopedProto.any[name] = BuilderFactory.PRESET.createSetter(handler)
+                }
+                const presetFor = (targetType, name, handler) => {
+                    const targetProto = targetType === "box" ? scopedProto.box : scopedProto.fields[targetType]
+                    if (!targetProto) {
+                        throw new Error(`[DSLEngine] Target type "${targetType}" does not exist.`)
+                    }
+                    validatePresetName(name, targetProto)
+                    if (Object.hasOwn(scopedProto.any, name)) {
+                        throw new Error(`[DSLEngine] Preset collision: "${name}" is already registered globally.`)
+                    }
+                    targetProto[name] = BuilderFactory.PRESET.createSetter(handler)
+                }
+                const buildPrototype = (specs, factory) => {
+                    const shared = Object.create(scopedProto.any)
+                    const methods = Object.fromEntries(Object.entries(specs).map(([propKey, propStrategy]) => [capitalize(propKey), factory.createSetter(propKey, propStrategy)]))
+                    const resolver = { [RESOLVE_SYM]: factory.createResolver(specs) }
+                    return Object.assign(shared, methods, resolver)
+                }
+                const assignProps = (box, innerField, props, specs) => {
+                    for (const [prop, value] of Object.entries(props)) {
                         const propResolver = specs[prop]
                         if (!propResolver) {
-                            throw new Error(`[SchemaBuilder] Property "${prop}" is NOT defined in the specs`)
+                            throw new Error(`[DSLEngine] Property "${prop}" is NOT defined in the specs`)
                         }
-                        propResolver.stage(box, innerField, prop, props[prop])
+                        propResolver.assign(box, innerField, prop, value)
                     }
                 }
                 const defineField = (type, specs = {}, defaultProps = {}) => {
                     const finalSpecs = { ...BaseSpecs.FIELD, ...specs }
-                    const proto = buildProto(finalSpecs, BuilderFactory.FIELD)
+                    const proto = buildPrototype(finalSpecs, BuilderFactory.FIELD)
+                    scopedProto.fields[type] = proto
                     return (key, overrideProps = {}) => {
                         const finalProps = { ...defaultProps, ...overrideProps }
                         const box = Object.create(proto)
                         const innerField = { type, key }
                         box.fields = [innerField]
-                        applyProps(box, innerField, finalProps, finalSpecs)
+                        assignProps(box, innerField, finalProps, finalSpecs)
                         return box
                     }
                 }
                 const defineBox = (specs = {}, defaultProps = {}) => {
                     const finalSpecs = { ...BaseSpecs.BOX, ...specs }
-                    const proto = buildProto(finalSpecs, BuilderFactory.BOX)
+                    const proto = buildPrototype(finalSpecs, BuilderFactory.BOX)
+                    scopedProto.box = proto
                     return (...args) => {
                         const box = Object.create(proto)
-                        applyProps(box, null, defaultProps, finalSpecs)
+                        assignProps(box, null, defaultProps, finalSpecs)
                         let argIdx = 0
                         if (args.length > 0 && typeof args[0] === "string") {
                             box.title = args[0]
                             argIdx++
                         }
-                        applyFields(box, args.slice(argIdx))
+                        appendFields(box, args.slice(argIdx))
                         return box
                     }
                 }
                 const createDefine = (context) => {
                     return (input) => normalizeBoxes(typeof input === "function" ? input(context) : input)
                 }
-                return { Dep, Tip, PropResolvers, createDefine, defineField, defineBox, preset }
+                return { Dep, Tip, PropResolvers, createDefine, defineField, defineBox, preset, presetFor }
             }
-            form.dslEngine.statics = { resolve, normalizeBoxes, applyFields, RESOLVE_SYM, Dep, Tip, PropResolvers, BaseSpecs, BuilderFactory }
-        }
+            form.dslEngine.statics = { resolveFields, resolveBoxes, normalizeBoxes, appendFields, RESOLVE_SYM, Dep, Tip, PropResolvers, BaseSpecs, BuilderFactory }
+        },
     }
 })()
 
@@ -2858,7 +2915,7 @@ const Control_Hotkey = {
     update: ({ element, value, field }) => {
         const input = element.querySelector(".hotkey-input")
         if (input) {
-            updateInputState(input, field, value || "")
+            updateInputState(input, field, utils.hotkeyHub.capitalize(value || ""))
         }
     },
     bindEvents: ({ form }) => {
@@ -2882,7 +2939,7 @@ const Control_Hotkey = {
                     utils.altKeyPressed(ev) ? "alt" : undefined,
                     ignoreKeys.includes(key) ? undefined : key,
                 ]
-                this.value = keyCombination.filter(Boolean).join("+")
+                this.value = utils.hotkeyHub.capitalize(keyCombination.filter(Boolean).join("+"))
                 updateHotkey(this)
             }
             ev.stopPropagation()

@@ -11,7 +11,7 @@ before(async () => {
     utils = {
         ...require("./mocks/utils.mock.js"),
         notification: { show: mock.fn((msg, type) => `notification.${type}: ${msg}`) },
-        hotkeyHub: { unregister: mock.fn((hotkey) => `hotkeyHub.unregister: ${hotkey}`) },
+        hotkeyHub: { unregister: mock.fn((hotkey) => `hotkeyHub.unregister: ${hotkey}`), capitalize: mock.fn(s => s) },
         formDialog: { modal: mock.fn(async (op) => ({ response: 1, data: op.data })) },
     }
     dom = require("./mocks/dom.mock.js")

@@ -1,6 +1,258 @@
-class ImageViewerPlugin extends BasePlugin {
-    imageGetter = null
+class ImageOperations {
+    constructor(imageEl, maskEl, config) {
+        this.image = imageEl
+        this.mask = maskEl
+        this.config = config
+        this.resetState()
+    }
+
+    resetState = () => {
+        this.state = { scale: 1, rotate: 0, flipX: 1, flipY: 1, translateX: 0, translateY: 0, skewX: 0, skewY: 0 }
+        this.apply()
+    }
+    apply = (moveCenter = true) => {
+        const { style } = this.image
+        const s = this.state
+        style.setProperty("--v-scale", s.scale)
+        style.setProperty("--v-rotate", `${s.rotate}deg`)
+        style.setProperty("--v-flip-x", s.flipX)
+        style.setProperty("--v-flip-y", s.flipY)
+        style.setProperty("--v-trans-x", `${s.translateX}px`)
+        style.setProperty("--v-trans-y", `${s.translateY}px`)
+        style.setProperty("--v-skew-x", `${s.skewX}deg`)
+        style.setProperty("--v-skew-y", `${s.skewY}deg`)
+        style.transform = `
+            translate(var(--v-trans-x), var(--v-trans-y))
+            scale(var(--v-flip-x), var(--v-flip-y))
+            scale(var(--v-scale))
+            rotate(var(--v-rotate))
+            skew(var(--v-skew-x), var(--v-skew-y))
+        `.trim()
+        if (moveCenter) this.moveImageCenter()
+    }
+    moveImageCenter = () => {
+        if (!this.mask || !this.image) return
+        const { width: maskWidth, height: maskHeight } = this.mask.getBoundingClientRect()
+        const { width: imageWidth, height: imageHeight } = this.image
+        this.image.style.left = `${(maskWidth - imageWidth) / 2}px`
+        this.image.style.top = `${(maskHeight - imageHeight) / 2}px`
+    }
+    zoom = (isOut, scaleStep = this.config.ZOOM_SCALE) => {
+        const delta = isOut ? -scaleStep : scaleStep
+        this.state.scale = Math.max(0.1, this.state.scale + delta)
+        this.apply()
+    }
+    setZoom = (targetScale) => {
+        this.state.scale = Math.max(0.1, targetScale)
+        this.apply()
+    }
+    rotate = (isRight, degStep = this.config.ROTATE_SCALE) => {
+        this.state.rotate += isRight ? degStep : -degStep
+        this.apply()
+    }
+    flip = (axis) => {
+        if (axis === "X") this.state.flipX *= -1
+        if (axis === "Y") this.state.flipY *= -1
+        this.apply()
+    }
+    skew = (isInc, axis, degStep = this.config.SKEW_SCALE) => {
+        const delta = isInc ? degStep : -degStep
+        if (axis === "X") this.state.skewX += delta
+        if (axis === "Y") this.state.skewY += delta
+        this.apply()
+    }
+    translate = (isLeftOrUp, axis, pxStep = this.config.TRANSLATE_SCALE) => {
+        const delta = isLeftOrUp ? -pxStep : pxStep
+        if (axis === "X") this.state.translateX += delta
+        if (axis === "Y") this.state.translateY += delta
+        this.apply(false)
+    }
+}
+
+class GalleryManager {
+    constructor(utils, config) {
+        this.utils = utils
+        this.config = config
+        this.imageGetter = null
+    }
+
+    _collectImage = () => {
+        const images = [...this.utils.entities.querySelectorAllInWrite("img")]
+        return this.config.SKIP_BROKEN_IMAGES ? images.filter(this.utils.isImgEmbed) : images
+    }
+
+    getAllImages = () => this._collectImage()
+
+    initImageMsgGetter = () => {
+        if (this.imageGetter) return
+
+        const images = this._collectImage()
+        this.imageGetter = this._createImageMsgGetter(images)
+        if (images.length === 0) return
+
+        const target = this._getTargetImage(images)
+        if (!target) return
+
+        while (true) {
+            const { img, showIdx, total } = this.imageGetter(true)
+            if (!img) return
+            if (img === target) return this.imageGetter(false)
+            if (showIdx === total) return
+        }
+    }
+
+    _createImageMsgGetter = images => {
+        let idx = -1
+        const maxIdx = images.length - 1
+        return (next = true) => {
+            idx += next ? 1 : -1
+            if (idx > maxIdx) idx = 0
+            else if (idx < 0) idx = maxIdx
+
+            const img = images[idx]
+            return {
+                img,
+                idx,
+                showIdx: images.length === 0 ? 0 : idx + 1,
+                src: img?.getAttribute("src") ?? "",
+                alt: img?.getAttribute("alt") ?? "",
+                naturalWidth: img?.naturalWidth ?? 0,
+                naturalHeight: img?.naturalHeight ?? 0,
+                total: images.length,
+                all: images,
+            }
+        }
+    }
+
+    _getTargetImage = images => {
+        const strategies = {
+            firstImage: imgs => imgs[0],
+            inViewBoxImage: imgs => imgs.find(img => this.utils.isInViewBox(img)),
+            closestViewBoxImage: imgs => imgs.reduce((closest, img) => {
+                const distance = Math.abs(img.getBoundingClientRect().top - window.innerHeight / 2)
+                return distance < closest.minDist ? { img, minDist: distance } : closest
+            }, { img: null, minDist: Number.MAX_VALUE }).img,
+        }
+
+        const strategyNames = [...this.config.FIRST_IMAGE_STRATEGIES, "firstImage"]
+        for (const name of strategyNames) {
+            const image = strategies[name]?.(images)
+            if (image) return image
+        }
+    }
+
+    dumpImage = (direction = "next", condition = () => true) => {
+        const isNext = direction === "next"
+        while (true) {
+            const curImg = this.imageGetter(isNext)
+            if (condition(curImg)) {
+                return curImg
+            }
+        }
+    }
+
+    dumpIndex = targetIdx => {
+        const safeIdx = Math.max(targetIdx, 0)
+        return this.dumpImage("next", img => img.total === 0 || img.idx === Math.min(safeIdx, img.total - 1))
+    }
+}
+
+class CommandDispatcher {
     playTimer = null
+
+    constructor(view, operations, gallery) {
+        this.view = view
+        this.operations = operations
+        this.commands = {
+            rotateLeft: scale => operations.rotate(false, scale),
+            rotateRight: scale => operations.rotate(true, scale),
+            zoomOut: scale => operations.zoom(true, scale),
+            zoomIn: scale => operations.zoom(false, scale),
+            hFlip: () => operations.flip("X"),
+            vFlip: () => operations.flip("Y"),
+            incHSkew: scale => operations.skew(true, "X", scale),
+            decHSkew: scale => operations.skew(false, "X", scale),
+            incVSkew: scale => operations.skew(true, "Y", scale),
+            decVSkew: scale => operations.skew(false, "Y", scale),
+            translateLeft: scale => operations.translate(true, "X", scale),
+            translateRight: scale => operations.translate(false, "X", scale),
+            translateUp: scale => operations.translate(true, "Y", scale),
+            translateDown: scale => operations.translate(false, "Y", scale),
+            originSize: () => this.setSize(true),
+            fitScreen: () => this.setSize(false),
+            autoSize: () => this.setSize(view.isOriginSize()),
+            restore: () => {
+                view.restoreSize()
+                operations.resetState()
+            },
+            nextImage: () => this.onImageChange(gallery.dumpImage("next")),
+            previousImage: () => this.onImageChange(gallery.dumpImage("previous")),
+            firstImage: () => this.onImageChange(gallery.dumpIndex(-1)),
+            lastImage: () => this.onImageChange(gallery.dumpIndex(Number.MAX_VALUE)),
+            jumpToIndex: idx => this.onImageChange(gallery.dumpIndex(idx)),
+            play: stop => this.play(stop),
+            thumbnailNav: force => view.thumbnailNav(force),
+            location: () => view.location(),
+            download: () => view.download(),
+            scroll: () => view.scroll(gallery.getAllImages()),
+            waterfall: () => view.waterfall(),
+            close: () => view.close(),
+            dummy: () => null,
+        }
+    }
+
+    execute = (actionName, arg) => {
+        const handler = this.getHandler(actionName)
+        if (typeof handler === "function") handler(arg)
+    }
+
+    getHandler = (actionName) => this.commands[actionName]
+
+    setSize = (isOrigin) => {
+        this.view.changeSize(isOrigin)
+        this.operations.setZoom(1)
+    }
+
+    onImageChange = (imgInfo) => {
+        if (!imgInfo) return
+        this.view.renderImage(imgInfo)
+        this.execute("restore")
+    }
+
+    play = (stop = false) => {
+        if (!stop && !this.playTimer) {
+            this.playTimer = setInterval(() => this.execute("nextImage"), this.view.config.AUTO_PLAY_INTERVAL * 1000)
+            this.view.setPlayButtonState(true)
+        } else {
+            clearInterval(this.playTimer)
+            this.playTimer = null
+            this.view.setPlayButtonState(false)
+        }
+    }
+}
+
+class ImageViewerPlugin extends BasePlugin {
+    operations = null
+    gallery = null
+    dispatcher = null
+
+    static OP_ICONS = {
+        dummy: "", info: "fa fa-info-circle", thumbnailNav: "fa fa-caret-square-o-down",
+        waterfall: "fa fa-list", close: "fa fa-times", download: "fa fa-download",
+        scroll: "fa fa-crosshairs", play: "fa fa-play", location: "fa fa-location-arrow",
+        nextImage: "fa fa-angle-right", previousImage: "fa fa-angle-left",
+        firstImage: "fa fa-fast-backward", lastImage: "fa fa-fast-forward",
+        zoomOut: "fa fa fa-search-minus", zoomIn: "fa fa fa-search-plus",
+        rotateLeft: "fa fa-rotate-left", rotateRight: "fa fa-rotate-right",
+        hFlip: "fa fa-arrows-h", vFlip: "fa fa-arrows-v",
+        translateLeft: "fa fa-arrow-left", translateRight: "fa fa-arrow-right",
+        translateUp: "fa fa-arrow-up", translateDown: "fa fa-arrow-down",
+        incHSkew: "fa fa-toggle-right", decHSkew: "fa fa-toggle-left",
+        incVSkew: "fa fa-toggle-up", decVSkew: "fa fa-toggle-down",
+        originSize: "fa fa-clock-o", fitScreen: "fa fa-codepen",
+        autoSize: "fa fa-search-plus", restore: "fa fa-history",
+    }
+    static KEY_TRANSLATE = { arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→", " ": "Space" }
 
     styleTemplate = () => ({
         imageMaxWidth: this.config.IMAGE_MAX_WIDTH + "%",
@@ -11,100 +263,32 @@ class ImageViewerPlugin extends BasePlugin {
     })
 
     html = () => {
-        const keyTranslate = { arrowup: "↑", arrowdown: "↓", arrowleft: "←", arrowright: "→", " ": "space" }
-        const opIcons = {
-            dummy: "",
-            info: "fa fa-info-circle",
-            thumbnailNav: "fa fa-caret-square-o-down",
-            waterfall: "fa fa-list",
-            close: "fa fa-times",
-            download: "fa fa-download",
-            scroll: "fa fa-crosshairs",
-            play: "fa fa-play",
-            location: "fa fa-location-arrow",
-            nextImage: "fa fa-angle-right",
-            previousImage: "fa fa-angle-left",
-            firstImage: "fa fa-fast-backward",
-            lastImage: "fa fa-fast-forward",
-            zoomOut: "fa fa fa-search-minus",
-            zoomIn: "fa fa fa-search-plus",
-            rotateLeft: "fa fa-rotate-left",
-            rotateRight: "fa fa-rotate-right",
-            hFlip: "fa fa-arrows-h",
-            vFlip: "fa fa-arrows-v",
-            translateLeft: "fa fa-arrow-left",
-            translateRight: "fa fa-arrow-right",
-            translateUp: "fa fa-arrow-up",
-            translateDown: "fa fa-arrow-down",
-            incHSkew: "fa fa-toggle-right",
-            decHSkew: "fa fa-toggle-left",
-            incVSkew: "fa fa-toggle-up",
-            decVSkew: "fa fa-toggle-down",
-            originSize: "fa fa-clock-o",
-            fitScreen: "fa fa-codepen",
-            autoSize: "fa fa-search-plus",
-            restore: "fa fa-history",
-        }
-        const opEntities = Object.fromEntries(Array.from(
-            Object.entries(opIcons),
-            ([op, icon]) => [op, { hint: this.i18n.t(`$option.operations.${op}`), icon }]
-        ))
+        const opEntities = Object.fromEntries(
+            Object.entries(this.constructor.OP_ICONS).map(([op, icon]) => [
+                op, { hint: this.i18n.t(`$option.operations.${op}`), icon },
+            ]),
+        )
+        opEntities.info.hint = this._buildInfoHint(opEntities)
 
-        const getInfoHint = () => {
-            const dummy = this.i18n.t("$option.operations.dummy")
-            const result = [this.i18n.t("currentConfig") + ":"]
-
-            const mouseClicks = this.i18n.array(["leftClick", "middleClick", "rightClick"], "mouse.")
-            const mouseWheels = this.i18n.array(["wheelUp", "wheelDown"], "mouse.")
-
-            const modifierKeys = ["", "CTRL", "SHIFT", "ALT"]
-            const mouseEvents = ["MOUSEDOWN_FUNCTION", "WHEEL_FUNCTION"]
-            mouseEvents.forEach(event => {
-                modifierKeys.forEach(modifier => {
-                    const key = modifier ? `${modifier}_${event}` : event
-                    const config = this.config[key]
-                    const events = (event === "MOUSEDOWN_FUNCTION") ? mouseClicks : mouseWheels
-                    events.forEach((ev, idx) => {
-                        const op = config[idx]
-                        const { hint } = opEntities[op]
-                        if (hint && hint !== dummy) {
-                            const keyCombo = (modifier ? `${modifier}+` : "") + ev
-                            result.push(keyCombo + "\t" + hint)
-                        }
-                    })
-                })
-            })
-            this.config.HOTKEY_FUNCTION.forEach(item => {
-                const { hotkey, fn } = item
-                const { hint } = opEntities[fn]
-                if (hint && hint !== dummy) {
-                    const translated = keyTranslate[hotkey.toLowerCase()] || hotkey
-                    result.push(translated + "\t" + hint)
-                }
-            })
-
-            return result.join("\n")
-        }
-
-        opEntities.info.hint = getInfoHint()
-
-        const columns = '<div class="viewer-waterfall-col"></div>'.repeat(this.config.WATERFALL_COLUMNS)
-        const messageList = this.config.SHOW_MESSAGE.map(m => `<div class="viewer-${m}"></div>`)
+        const columns = `<div class="viewer-waterfall-col"></div>`.repeat(this.config.WATERFALL_COLUMNS)
+        const messageList = this.config.SHOW_MESSAGE.map(m => `<div class="viewer-${m}"></div>`).join("")
         const operationList = this.config.TOOL_FUNCTION
-            .filter(option => Object.hasOwn(opEntities, option))
-            .map(option => {
-                const { hint, icon } = opEntities[option]
-                return `<i class="${icon}" option="${option}" title="${hint}"></i>`
-            })
-        const class_ = this.config.SHOW_THUMBNAIL_NAV ? "" : "plugin-common-hidden"
+            .filter(op => Object.hasOwn(opEntities, op))
+            .map(op => `<i class="${opEntities[op].icon}" option="${op}" title="${opEntities[op].hint}"></i>`)
+            .join("")
+
+        const navClass = this.config.SHOW_THUMBNAIL_NAV ? "" : "plugin-common-hidden"
+
         return `
             <div id="plugin-image-viewer" class="plugin-viewer-cover plugin-common-hidden">
                 <div class="viewer-tool">
-                    <div class="viewer-message">${messageList.join("")}</div>
-                    <div class="viewer-options">${operationList.join("")}</div>
+                    <div class="viewer-message">${messageList}</div>
+                    <div class="viewer-options">${operationList}</div>
                 </div>
-                <div class="viewer-waterfall plugin-common-hidden"><div class="viewer-waterfall-container">${columns}</div></div>
-                <div class="viewer-nav ${class_}"></div>
+                <div class="viewer-waterfall plugin-common-hidden">
+                    <div class="viewer-waterfall-container">${columns}</div>
+                </div>
+                <div class="viewer-nav ${navClass}"></div>
                 <img class="viewer-image" alt=""/>
                 <div class="viewer-item" action="previousImage"><i class="fa fa-angle-left"></i></div>
                 <div class="viewer-item" action="nextImage"><i class="fa fa-angle-right"></i></div>
@@ -112,354 +296,218 @@ class ImageViewerPlugin extends BasePlugin {
             </div>`
     }
 
-    hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
+    _buildInfoHint = (opEntities) => {
+        const result = [`${this.i18n.t("currentConfig")}:`]
+        const dummy = this.i18n.t("$option.operations.dummy")
+        const modifierKeys = ["", "CTRL", "SHIFT", "ALT"]
+        const mouseEvents = [
+            { name: "MOUSEDOWN_FUNCTION", events: this.i18n.array(["leftClick", "middleClick", "rightClick"], "mouse.") },
+            { name: "WHEEL_FUNCTION", events: this.i18n.array(["wheelUp", "wheelDown"], "mouse.") },
+        ]
 
-    call = () => {
-        if (this.utils.isHidden(this.entities.viewer)) {
-            this.show()
-        } else {
-            this.close()
+        for (const { name, events } of mouseEvents) {
+            for (const modifier of modifierKeys) {
+                const configKey = modifier ? `${modifier}_${name}` : name
+                const config = this.config[configKey]
+                events.forEach((evName, idx) => {
+                    const op = config[idx]
+                    const hint = opEntities[op]?.hint
+                    if (hint && hint !== dummy) {
+                        const keyCombo = (modifier ? `${modifier}+` : "") + evName
+                        result.push(`${keyCombo}\t${hint}`)
+                    }
+                })
+            }
         }
+
+        this.config.HOTKEY_FUNCTION.forEach(({ hotkey, fn }) => {
+            const hint = opEntities[fn]?.hint
+            if (hint && hint !== dummy) {
+                const translatedKey = this.constructor.KEY_TRANSLATE[hotkey.toLowerCase()] || hotkey
+                result.push(`${translatedKey}\t${hint}`)
+            }
+        })
+
+        return result.join("\n")
     }
 
+    hotkey = () => [{ hotkey: this.config.HOTKEY, callback: this.call }]
+
+    call = () => this.utils.isHidden(this.entities.viewer) ? this.show() : this.close()
+
     init = () => {
+        const root = document.getElementById("plugin-image-viewer")
         this.entities = {
-            viewer: document.getElementById("plugin-image-viewer"),
-            mask: document.querySelector("#plugin-image-viewer .viewer-mask"),
-            waterfall: document.querySelector("#plugin-image-viewer .viewer-waterfall"),
-            nav: document.querySelector("#plugin-image-viewer .viewer-nav"),
-            image: document.querySelector("#plugin-image-viewer .viewer-image"),
-            msg: document.querySelector("#plugin-image-viewer .viewer-message"),
-            ops: document.querySelector("#plugin-image-viewer .viewer-options"),
-            close: document.querySelector("#plugin-image-viewer .viewer-close"),
+            viewer: root,
+            mask: root.querySelector(".viewer-mask"),
+            waterfall: root.querySelector(".viewer-waterfall"),
+            nav: root.querySelector(".viewer-nav"),
+            image: root.querySelector(".viewer-image"),
+            msg: root.querySelector(".viewer-message"),
+            ops: root.querySelector(".viewer-options"),
+            close: root.querySelector(".viewer-close"),
         }
+        this.operations = new ImageOperations(this.entities.image, this.entities.mask, this.config)
+        this.gallery = new GalleryManager(this.utils, this.config)
+        this.dispatcher = new CommandDispatcher(this, this.operations, this.gallery)
     }
 
     process = () => {
+        const { eventHub } = this.utils
+
         if (this.config.CLICK_MASK_TO_EXIT) {
             this.entities.mask.addEventListener("click", this.call)
         }
-        this.utils.eventHub.addEventListener(this.utils.eventHub.eventType.toggleSettingPage, hide => hide && this.close())
-        this.entities.viewer.querySelectorAll(".viewer-item").forEach(el => {
-            el.addEventListener("click", ev => {
-                const act = ev.target.closest(".viewer-item").getAttribute("action")
-                this[act]?.()
-            })
+        eventHub.addEventListener(eventHub.eventType.toggleSettingPage, hide => hide && this.close())
+        this.entities.viewer.addEventListener("click", ev => {
+            const item = ev.target.closest(".viewer-item")
+            if (item) {
+                const act = item.getAttribute("action")
+                this.dispatcher.execute(act)
+            }
         })
         this.entities.viewer.addEventListener("wheel", ev => {
             if (this.utils.isShown(this.entities.waterfall)) return
             ev.preventDefault()
-            const list = this.getFnList(ev, "WHEEL")
-            const fn = list[ev.deltaY > 0 ? 1 : 0]
+            const fnList = this.getFnList(ev, "WHEEL")
+            const fn = fnList[ev.deltaY > 0 ? 1 : 0]
             if (typeof fn === "function") fn()
         }, { passive: false })
         this.entities.image.addEventListener("mousedown", ev => {
-            const list = this.getFnList(ev, "MOUSEDOWN")
-            const fn = list[ev.button]
+            const fnList = this.getFnList(ev, "MOUSEDOWN")
+            const fn = fnList[ev.button]
             if (typeof fn === "function") fn()
         })
         this.entities.ops.addEventListener("click", ev => {
             const target = ev.target.closest("[option]")
             if (!target) return
             const option = target.getAttribute("option")
-            const arg = option.indexOf("rotate") !== -1 ? 90 : undefined
-            if (typeof this[option] === "function") this[option](arg)
+            const arg = option.includes("rotate") ? 90 : undefined
+            this.dispatcher.execute(option, arg)
         })
         this.entities.nav.addEventListener("click", ev => {
             const target = ev.target.closest(".viewer-thumbnail")
-            if (target) this.dumpIndex(parseInt(target.dataset.idx))
+            if (target) {
+                this.dispatcher.execute("jumpToIndex", parseInt(target.dataset.idx, 10))
+            }
         })
         this.entities.waterfall.addEventListener("click", ev => {
             const target = ev.target.closest(".viewer-waterfall-item")
-            this.waterfall()
-            if (target) this.dumpIndex(parseInt(target.dataset.idx))
+            this.dispatcher.execute("waterfall")
+            if (target) {
+                this.dispatcher.execute("jumpToIndex", parseInt(target.dataset.idx, 10))
+            }
         })
         this.entities.nav.addEventListener("wheel", ev => {
-            const target = ev.target.closest("#plugin-image-viewer .viewer-nav")
-            target.scrollLeft += ev.deltaY * 0.5
+            const target = ev.target.closest(".viewer-nav")
+            if (target) target.scrollLeft += ev.deltaY * 0.5
             ev.stopPropagation()
         }, { passive: true })
     }
 
     getFnList = (ev, method) => {
-        const arg = []
-        if (this.utils.metaKeyPressed(ev)) arg.push("CTRL")
-        else if (this.utils.shiftKeyPressed(ev)) arg.push("SHIFT")
-        else if (this.utils.altKeyPressed(ev)) arg.push("ALT")
-        arg.push(method, "FUNCTION")
-        const config = this.config[arg.join("_")]
-        return config.map(e => this[e])
+        const modifiers = []
+        if (this.utils.metaKeyPressed(ev)) modifiers.push("CTRL")
+        else if (this.utils.shiftKeyPressed(ev)) modifiers.push("SHIFT")
+        else if (this.utils.altKeyPressed(ev)) modifiers.push("ALT")
+        modifiers.push(method, "FUNCTION")
+        const configKey = modifiers.join("_")
+        return (this.config[configKey] || []).map(fnName => this.dispatcher.getHandler(fnName))
     }
 
-    replaceImageTransform = (regex, fn, moveCenter = true) => {
-        this.entities.image.style.transform = this.entities.image.style.transform.replace(regex, fn)
-        if (moveCenter) this.moveImageCenter()
-    }
-
-    rotate = (dec, newRotate, rotateScale) => this.replaceImageTransform(/rotate\((.*?)deg\)/, (_, curRotate) => {
-        if (!newRotate) {
-            const currentRotate = parseFloat(curRotate)
-            rotateScale = rotateScale || this.config.ROTATE_SCALE
-            newRotate = dec ? currentRotate + rotateScale : currentRotate - rotateScale
-        }
-        return `rotate(${newRotate}deg)`
-    })
-
-    zoom = (dec, newScale, zoomScale) => this.replaceImageTransform(/scale\((.*?)\)/, (_, curScale) => {
-        if (!newScale) {
-            const currentScale = parseFloat(curScale)
-            zoomScale = zoomScale || this.config.ZOOM_SCALE
-            newScale = dec ? currentScale - zoomScale : currentScale + zoomScale
-        }
-        newScale = Math.max(0.1, newScale)
-        return `scale(${newScale})`
-    })
-
-    skew = (dec, direction, newSkew, skewScale) => this.replaceImageTransform(new RegExp(`skew${direction}\\((.*?)deg\\)`), (_, curSkew) => {
-        if (!newSkew) {
-            const currentSkew = parseFloat(curSkew)
-            skewScale = skewScale || this.config.SKEW_SCALE
-            newSkew = dec ? currentSkew - skewScale : currentSkew + skewScale
-        }
-        return `skew${direction}(${newSkew}deg)`
-    })
-
-    translate = (dec, direction, newTranslate, translateScale) => this.replaceImageTransform(new RegExp(`translate${direction}\\((.*?)px\\)`), (_, curTranslate) => {
-        if (!newTranslate) {
-            const currentTranslate = parseFloat(curTranslate)
-            translateScale = translateScale || this.config.TRANSLATE_SCALE
-            newTranslate = dec ? currentTranslate - translateScale : currentTranslate + translateScale
-        }
-        return `translate${direction}(${newTranslate}px)`
-    }, false)
-
-    flip = direction => this.replaceImageTransform(new RegExp(`scale${direction}\\((.*?)\\)`), (_, curScale) => {
-        const currentScale = parseInt(curScale)
-        return `scale${direction}(${-currentScale})`
-    })
-
-    changeSize = (origin = true) => {
-        const value = origin ? "initial" : ""
-        const class_ = origin ? "fa fa-search-minus" : "fa fa-search-plus"
+    changeSize = (isOrigin = true) => {
+        const value = isOrigin ? "initial" : ""
+        const class_ = isOrigin ? "fa fa-search-minus" : "fa fa-search-plus"
         this.entities.image.style.maxWidth = value
         this.entities.image.style.maxHeight = value
-        this.entities.ops.querySelector(`[option="autoSize"]`).className = class_
-        this.zoom(null, 1)
+        const autoSizeIcon = this.entities.ops.querySelector(`[option="autoSize"]`)
+        if (autoSizeIcon) autoSizeIcon.className = class_
     }
 
-    moveImageCenter = () => {
-        const { width: maskWidth, height: maskHeight } = this.entities.mask.getBoundingClientRect()
-        const { width: imageWidth, height: imageHeight } = this.entities.image
-        this.entities.image.style.left = (maskWidth - imageWidth) / 2 + "px"
-        this.entities.image.style.top = (maskHeight - imageHeight) / 2 + "px"
+    isOriginSize = () => this.entities.image.style.maxWidth !== "initial"
+
+    restoreSize = () => {
+        this.entities.image.style.maxWidth = ""
+        this.entities.image.style.maxHeight = ""
     }
 
-    dumpImage = (direction = "next", condition = () => true) => {
-        const next = direction === "next"
-        while (true) {
-            const curImg = this.imageGetter(next)
-            if (condition(curImg)) {
-                this._showImage(curImg)
-                return curImg
-            }
+    renderImage = imgInfo => {
+        this._updateMessageBar(imgInfo)
+        this._updateToolIcons(imgInfo.src)
+        this._updateThumbnailActive(imgInfo.showIdx)
+    }
+
+    _updateMessageBar = ({ src, alt, naturalWidth, naturalHeight, showIdx, idx, total }) => {
+        this.entities.image.setAttribute("src", src)
+        this.entities.image.setAttribute("data-idx", idx)
+
+        const { msg } = this.entities
+        const indexEl = msg.querySelector(".viewer-index")
+        const titleEl = msg.querySelector(".viewer-title")
+        const sizeEl = msg.querySelector(".viewer-size")
+
+        if (indexEl) indexEl.textContent = `[ ${showIdx} / ${total} ]`
+        if (titleEl) titleEl.textContent = alt
+        if (sizeEl) sizeEl.textContent = `${naturalWidth} × ${naturalHeight}`
+    }
+
+    _updateToolIcons = src => {
+        const autoSize = this.entities.ops.querySelector(`[option="autoSize"]`)
+        const download = this.entities.ops.querySelector(`[option="download"]`)
+        if (autoSize) autoSize.className = "fa fa-search-plus"
+        if (download) this.utils.toggleInvisible(download, !this.utils.isNetworkImage(src))
+    }
+
+    _updateThumbnailActive = showIdx => {
+        this.entities.nav.querySelector(".select")?.classList.remove("select")
+        const active = this.entities.nav.querySelector(`.viewer-thumbnail[data-idx="${showIdx - 1}"]`)
+        if (active) {
+            active.classList.add("select")
+            active.scrollIntoView({ inline: "nearest", behavior: "smooth" })
         }
     }
 
-    dumpIndex = targetIdx => {
-        targetIdx = Math.max(targetIdx, 0)
-        return this.dumpImage("next", img => img.idx === Math.min(targetIdx, img.total - 1))
+    initThumbnailNav = (current = {}) => {
+        const { idx: targetIdx, all = [] } = current
+        this.entities.nav.innerHTML = all.map((img, idx) => {
+            const activeClass = idx === targetIdx ? "select" : ""
+            return `<img class="viewer-thumbnail ${activeClass}" src="${img.src}" alt="${img.alt}" data-idx="${idx}">`
+        }).join("")
     }
 
     waterfall = () => {
         const columns = [...this.entities.waterfall.querySelectorAll(".viewer-waterfall-col")]
 
-        const toggleComponent = hide => {
+        const toggleComponent = isHide => {
             [...this.entities.viewer.children]
                 .filter(el => !el.classList.contains("viewer-waterfall") && !el.classList.contains("viewer-mask"))
-                .forEach(el => this.utils.toggleInvisible(el, hide))
+                .forEach(el => this.utils.toggleInvisible(el, isHide))
         }
 
-        const getMinHeightColumn = () => {
-            const minHeight = Math.min(...columns.map(col => col.offsetHeight))
-            return columns.find(col => col.offsetHeight === minHeight)
+        const navToWaterfall = () => {
+            const getMinHeightCol = () => columns.reduce((min, col) => col.offsetHeight < min.offsetHeight ? col : min, columns[0])
+            ;[...this.entities.nav.children].forEach(img => {
+                img.classList.replace("viewer-thumbnail", "viewer-waterfall-item")
+                getMinHeightCol().appendChild(img)
+            })
         }
 
-        const nav2WaterFall = () => {
-            [...this.entities.nav.children]
-                .map(img => {
-                    img.classList.remove("viewer-thumbnail")
-                    img.classList.add("viewer-waterfall-item")
-                    return img
-                })
-                .forEach(img => getMinHeightColumn().appendChild(img))
-        }
-
-        const waterFall2Nav = () => {
-            const fallChildren = [...this.entities.waterfall.querySelectorAll(".viewer-waterfall-item")]
-                .sort((a, b) => parseInt(a.dataset.idx) - parseInt(b.dataset.idx))
-                .map(img => {
-                    img.classList.remove("viewer-waterfall-item")
-                    img.classList.add("viewer-thumbnail")
-                    return img
-                })
-            this.entities.nav.append(...fallChildren)
+        const waterfallToNav = () => {
+            const items = [...this.entities.waterfall.querySelectorAll(".viewer-waterfall-item")]
+                .sort((a, b) => parseInt(a.dataset.idx, 10) - parseInt(b.dataset.idx, 10))
+            items.forEach(img => img.classList.replace("viewer-waterfall-item", "viewer-thumbnail"))
+            this.entities.nav.append(...items)
         }
 
         this.utils.toggleInvisible(this.entities.waterfall)
         if (this.utils.isHidden(this.entities.waterfall)) {
-            waterFall2Nav()
+            waterfallToNav()
             toggleComponent(false)
         } else {
-            columns.forEach(e => e.innerHTML = "")
+            columns.forEach(col => col.innerHTML = "")
             toggleComponent(true)
-            nav2WaterFall()
+            navToWaterfall()
             this.entities.waterfall.querySelector(".viewer-waterfall-item.select")?.scrollIntoView()
-        }
-    }
-
-    _showImage = imgInfo => {
-        const handleMessage = imgInfo => {
-            const { src, alt, naturalWidth, naturalHeight, showIdx, idx, total } = imgInfo
-            this.entities.image.setAttribute("src", src)
-            this.entities.image.setAttribute("data-idx", idx)
-            const index = this.entities.msg.querySelector(".viewer-index")
-            const title = this.entities.msg.querySelector(".viewer-title")
-            const size = this.entities.msg.querySelector(".viewer-size")
-            if (index) (index.textContent = `[ ${showIdx} / ${total} ]`)
-            if (title) (title.textContent = alt)
-            if (size) (size.textContent = `${naturalWidth} × ${naturalHeight}`)
-        }
-
-        const handleToolIcon = src => {
-            const autoSize = this.entities.ops.querySelector(`[option="autoSize"]`)
-            const download = this.entities.ops.querySelector(`[option="download"]`)
-            if (autoSize) (autoSize.className = "fa fa-search-plus")
-            if (download) this.utils.toggleInvisible(download, !this.utils.isNetworkImage(src))
-        }
-
-        const handleThumbnail = showIdx => {
-            this.entities.nav.querySelector(".select")?.classList.remove("select")
-            const active = this.entities.nav.querySelector(`.viewer-thumbnail[data-idx="${showIdx - 1}"]`)
-            if (active) {
-                active.classList.add("select")
-                active.scrollIntoView({ inline: "nearest", behavior: "smooth" })
-            }
-        }
-
-        handleMessage(imgInfo)
-        handleToolIcon(imgInfo.src)
-        handleThumbnail(imgInfo.showIdx)
-        this.restore()
-    }
-
-    _collectImage = () => {
-        let images = [...this.utils.entities.querySelectorAllInWrite("img")]
-        if (this.config.SKIP_BROKEN_IMAGES) {
-            images = images.filter(this.utils.isImgEmbed)
-        }
-        return images
-    }
-
-    initImageMsgGetter = () => {
-        if (this.imageGetter) return
-
-        let images = this._collectImage()
-        this.imageGetter = this._imageMsgGetter(images)
-
-        if (images.length === 0) return
-
-        let target = this._getTargetImage(images)
-        if (!target) return
-
-        while (true) {
-            const { img, showIdx, total } = this.imageGetter(true)
-            if (!img) return
-
-            if (img === target) {
-                return this.imageGetter(false)
-            }
-            // Defensive code to prevent infinite loops.
-            if (showIdx === total) return
-        }
-    }
-
-    _imageMsgGetter = images => {
-        let idx = -1
-        return (next = true) => {
-            next ? idx++ : idx--
-            const maxIdx = images.length - 1
-            if (idx > maxIdx) {
-                idx = 0
-            } else if (idx < 0) {
-                idx = maxIdx
-            }
-            const img = images[idx]
-            return {
-                img,
-                idx,
-                showIdx: (images.length === 0) ? 0 : idx + 1,
-                src: img?.getAttribute("src") ?? "",
-                alt: img?.getAttribute("alt") ?? "",
-                naturalWidth: img?.naturalWidth ?? 0,
-                naturalHeight: img?.naturalHeight ?? 0,
-                total: images.length || 0,
-                all: images,
-            }
-        }
-    }
-
-    _getTargetImage = images => {
-        const strategies = {
-            firstImage: images => images[0],
-            inViewBoxImage: images => images.find(img => this.utils.isInViewBox(img)),
-            closestViewBoxImage: images => {
-                let closestImg = null
-                let minDistance = Number.MAX_VALUE
-                images.forEach(img => {
-                    const distance = Math.abs(img.getBoundingClientRect().top - window.innerHeight / 2)
-                    if (distance < minDistance) {
-                        minDistance = distance
-                        closestImg = img
-                    }
-                })
-                return closestImg
-            },
-        }
-        // firstImage as a fallback strategy
-        const fnList = [...this.config.FIRST_IMAGE_STRATEGIES, "firstImage"].map(s => strategies[s]).filter(Boolean)
-        for (const fn of fnList) {
-            const image = fn(images)
-            if (image) {
-                return image
-            }
-        }
-    }
-
-    initThumbnailNav = current => {
-        const { idx: targetIdx, all = [] } = current || {}
-        const thumbnails = all.map((img, idx) => {
-            const select = idx === targetIdx ? "select" : ""
-            return `<img class="viewer-thumbnail ${select}" src="${img.src}" alt="${img.alt}" data-idx="${idx}">`
-        })
-        this.entities.nav.innerHTML = thumbnails.join("")
-    }
-
-    handleHotkey = (remove = false) => {
-        const unregister = item => this.utils.hotkeyHub.unregister(item.hotkey)
-        const register = item => this.utils.hotkeyHub.registerSingle(item.hotkey, this[item.fn] || this.dummy)
-        this.config.HOTKEY_FUNCTION.forEach(remove ? unregister : register)
-    }
-
-    handlePlayTimer = (stop = false) => {
-        const btn = this.entities.ops.querySelector(`[option="play"]`)
-        if (!btn) return
-        if (!stop && !this.playTimer) {
-            this.playTimer = setInterval(this.nextImage, this.config.AUTO_PLAY_INTERVAL * 1000)
-            btn.classList.add("active")
-        } else {
-            btn.classList.remove("active")
-            clearInterval(this.playTimer)
-            this.playTimer = null
         }
     }
 
@@ -467,78 +515,64 @@ class ImageViewerPlugin extends BasePlugin {
         this.config.SHOW_THUMBNAIL_NAV = !this.config.SHOW_THUMBNAIL_NAV
         this.utils.toggleInvisible(this.entities.nav, force)
     }
-    play = () => this.handlePlayTimer(!!this.playTimer)
-    restore = () => {
-        const transform = "scale(1) rotate(0deg) scaleX(1) scaleY(1) skewX(0deg) skewY(0deg) translateX(0px) translateY(0px)"
-        Object.assign(this.entities.image.style, { maxWidth: "", maxHeight: "", transform })
-        this.moveImageCenter()
-    }
+
+    setPlayButtonState = (isActive) => this.entities.ops.querySelector(`[option="play"]`)?.classList.toggle("active", isActive)
+
     location = () => {
         let src = this.entities.image.getAttribute("src")
         if (this.utils.isNetworkImage(src)) {
             this.utils.openUrl(src)
         } else if (this.utils.isSpecialImage(src)) {
-            alert("this image cannot locate")
+            alert("This Image Cannot Locate")
         } else {
-            // src = src.replace(/^file:\/[2-3]/, "")
             src = decodeURI(window.removeLastModifyQuery(src))
             if (src) this.utils.showInFinder(src)
         }
     }
+
     download = async () => {
         const src = this.entities.image.getAttribute("src")
         if (!this.utils.isNetworkImage(src)) return
         const { ok, filepath } = await this.utils.downloadImage(src)
-        if (ok) {
-            this.utils.showInFinder(filepath)
-        } else {
-            alert("download image failed")
-        }
+        ok ? this.utils.showInFinder(filepath) : alert("Download Image Failed")
     }
-    scroll = () => {
-        const idx = parseInt(this.entities.image.dataset.idx)
-        const image = this._collectImage()[idx]
+
+    scroll = (allImages) => {
+        const idx = parseInt(this.entities.image.dataset.idx, 10)
+        const image = allImages[idx]
         this.close()
         if (image) this.utils.scroll(image, { height: 30 })
     }
+
+    handleHotkey = (isRemove = false) => {
+        const { hotkeyHub } = this.utils
+        this.config.HOTKEY_FUNCTION.forEach(item => {
+            if (isRemove) {
+                hotkeyHub.unregister(item.hotkey)
+            } else {
+                const handler = this.dispatcher.getHandler(item.fn) || this.utils.noop
+                hotkeyHub.registerSingle(item.hotkey, handler)
+            }
+        })
+    }
+
     show = () => {
         document.activeElement.blur()
         this.handleHotkey(false)
         this.utils.show(this.entities.viewer)
-        const cur = this.initImageMsgGetter()
-        this.initThumbnailNav(cur)
-        this.dumpImage()
+        const currentInfo = this.gallery.initImageMsgGetter()
+        this.initThumbnailNav(currentInfo)
+        this.dispatcher.execute("nextImage")
     }
+
     close = () => {
         this.handleHotkey(true)
-        this.handlePlayTimer(true)
+        this.dispatcher.execute("play", true)
         this.utils.hide(this.entities.viewer)
-        this.imageGetter = null
+        this.gallery.imageGetter = null
     }
-    dummy = this.utils.noop
-    nextImage = () => this.dumpImage("next")
-    previousImage = () => this.dumpImage("previous")
-    firstImage = () => this.dumpIndex(-1)
-    lastImage = () => this.dumpIndex(Number.MAX_VALUE)
-    rotateLeft = rotateScale => this.rotate(false, null, rotateScale)
-    rotateRight = rotateScale => this.rotate(true, null, rotateScale)
-    zoomOut = zoomScale => this.zoom(true, null, zoomScale)
-    zoomIn = zoomScale => this.zoom(false, null, zoomScale)
-    hFlip = () => this.flip("X")
-    vFlip = () => this.flip("Y")
-    incHSkew = skewScale => this.skew(true, "X", null, skewScale)
-    decHSkew = skewScale => this.skew(false, "X", null, skewScale)
-    incVSkew = skewScale => this.skew(true, "Y", null, skewScale)
-    decVSkew = skewScale => this.skew(false, "Y", null, skewScale)
-    translateLeft = translateScale => this.translate(true, "X", null, translateScale)
-    translateRight = translateScale => this.translate(false, "X", null, translateScale)
-    translateUp = translateScale => this.translate(true, "Y", null, translateScale)
-    translateDown = translateScale => this.translate(false, "Y", null, translateScale)
-    originSize = () => this.changeSize(true)
-    fitScreen = () => this.changeSize(false)
-    autoSize = () => this.changeSize(this.entities.image.style.maxWidth !== "initial")
 }
 
 module.exports = {
-    plugin: ImageViewerPlugin
+    plugin: ImageViewerPlugin,
 }

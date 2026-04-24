@@ -202,14 +202,21 @@ class StrategyAdaptiveHysteresis extends BaseAdaptiveStrategy {
     }
 }
 
+const STATES = { IDLE: "idle", TRACKING: "tracking", PAUSED: "paused", DESTROYED: "destroyed" }
+const ACTIONS = { DOWN: "down", UP: "up", ABORT: "abort", PAUSE: "pause", RESUME: "resume", DESTROY: "destroy" }
+
 class GestureEngine {
     plugins = new Map()
-    isTracking = false
-    isAborted = false
-    isPaused = false
     hasMovedSinceStart = false
     lastMoveTimestamp = 0
     currentTriggerButton = null
+    currentState = STATES.IDLE
+    _transitions = {
+        [STATES.IDLE]: { [ACTIONS.DOWN]: STATES.TRACKING, [ACTIONS.PAUSE]: STATES.PAUSED, [ACTIONS.DESTROY]: STATES.DESTROYED },
+        [STATES.TRACKING]: { [ACTIONS.UP]: STATES.IDLE, [ACTIONS.ABORT]: STATES.IDLE, [ACTIONS.PAUSE]: STATES.PAUSED, [ACTIONS.DESTROY]: STATES.DESTROYED },
+        [STATES.PAUSED]: { [ACTIONS.RESUME]: STATES.IDLE, [ACTIONS.DESTROY]: STATES.DESTROYED },
+        [STATES.DESTROYED]: {},
+    }
     _sharedMovePayload = {
         point: { x: 0, y: 0 },
         paths: null,
@@ -228,6 +235,25 @@ class GestureEngine {
         this.setStrategy(this.options.strategy)
         this._bindEvents()
     }
+
+    get isIdle() {
+        return this.currentState === STATES.IDLE
+    }
+
+    get isTracking() {
+        return this.currentState === STATES.TRACKING
+    }
+
+    get isPaused() {
+        return this.currentState === STATES.PAUSED
+    }
+
+    get isDestroyed() {
+        return this.currentState === STATES.DESTROYED
+    }
+
+    hasMoved = () => this.hasMovedSinceStart
+    getLastMoveTimestamp = () => this.lastMoveTimestamp
 
     updateConfig = (newConfig) => this.options = { ...this.options, ...newConfig }
 
@@ -264,35 +290,45 @@ class GestureEngine {
     getPlugin = (id) => this.plugins.get(id)
 
     pause = () => {
-        if (this.isPaused) return
-        this.isPaused = true
-        if (this.isTracking) this.abort("paused")
-        this._invokeHook("onPaused", null)
+        const wasTracking = this.currentState === STATES.TRACKING
+        if (this._next(ACTIONS.PAUSE)) {
+            if (wasTracking) {
+                this._invokeHook("onAbort", { reason: "paused" })
+            }
+            this._invokeHook("onPaused", null)
+        }
     }
 
     resume = () => {
-        if (!this.isPaused) return
-        this.isPaused = false
-        this._invokeHook("onResumed", null)
+        if (this._next(ACTIONS.RESUME)) {
+            this._invokeHook("onResumed", null)
+        }
     }
 
     abort = (reason = "aborted") => {
-        if (!this.isTracking || this.isAborted) return
-        this.isTracking = false
-        this.isAborted = true
-        this.currentTriggerButton = null
-        this._invokeHook("onAbort", { reason })
+        if (this._next(ACTIONS.ABORT)) {
+            this._invokeHook("onAbort", { reason })
+        }
     }
 
     destroy = () => {
-        this._unbindEvents()
-        this.plugins.forEach(p => p.uninstall?.())
-        this.plugins.clear()
-        this._invokeHook("onDestroyed", null)
+        if (this._next(ACTIONS.DESTROY)) {
+            this._unbindEvents()
+            this._invokeHook("onDestroyed", null)
+            this.plugins.forEach(p => p.uninstall?.())
+            this.plugins.clear()
+        }
     }
 
-    getHasMoved = () => this.hasMovedSinceStart
-    getLastMoveTimestamp = () => this.lastMoveTimestamp
+    _next = (action) => {
+        const nextState = this._transitions[this.currentState]?.[action]
+        if (!nextState) return false
+        if (this.currentState === STATES.TRACKING && nextState !== STATES.TRACKING) {
+            this.currentTriggerButton = null
+        }
+        this.currentState = nextState
+        return true
+    }
 
     _invokeHook = (hookName, payload) => {
         for (const plugin of this.plugins.values()) plugin[hookName]?.(payload)
@@ -326,13 +362,14 @@ class GestureEngine {
         target[fn]("mousedown", this._onNativeBehavior, blockOpts)
         target[fn]("mouseup", this._onNativeBehavior, blockOpts)
         // target[fn]("auxclick", this._onNativeBehavior, blockOpts)
+        window.addEventListener("blur", this._onWindowLostFocus)
     }
 
     _bindEvents = () => this._toggleEvents(true)
     _unbindEvents = () => this._toggleEvents(false)
 
     _onNativeBehavior = (ev) => {
-        if (this.isPaused) return
+        if (this.currentState === STATES.PAUSED || this.currentState === STATES.DESTROYED) return
         if (!this.options.triggerButtons.includes(ev.button)) return
         if (ev.button === 1 && ev.type === "mousedown") {
             ev.preventDefault()
@@ -345,9 +382,11 @@ class GestureEngine {
     }
 
     _onPointerDown = (ev) => {
-        if (this.isTracking || this.isPaused) return
+        if (!this._transitions[this.currentState]?.[ACTIONS.DOWN]) return
         if (this.options.allowedPointerTypes && !this.options.allowedPointerTypes.includes(ev.pointerType)) return
         if (!this.options.triggerButtons.includes(ev.button)) return
+
+        this.hasMovedSinceStart = false
 
         const payload = { originalEvent: ev, triggerButton: ev.button }
         if (this._invokeBailoutHook("onBeforeStart", payload) === false) {
@@ -355,11 +394,9 @@ class GestureEngine {
             return
         }
 
-        ev.target.setPointerCapture?.(ev.pointerId)
+        if (!this._next(ACTIONS.DOWN)) return
 
-        this.isTracking = true
-        this.isAborted = false
-        this.hasMovedSinceStart = false
+        ev.target.setPointerCapture?.(ev.pointerId)
         this.currentTriggerButton = ev.button
         this.lastMoveTimestamp = ev.timeStamp
 
@@ -373,7 +410,7 @@ class GestureEngine {
     }
 
     _onPointerMove = (ev) => {
-        if (!this.isTracking || this.isAborted) return
+        if (this.currentState !== STATES.TRACKING) return
         this.hasMovedSinceStart = true
         this.lastMoveTimestamp = ev.timeStamp
 
@@ -394,30 +431,33 @@ class GestureEngine {
     }
 
     _onPointerUp = (ev) => {
-        if (!this.isTracking || this.isAborted || ev.button !== this.currentTriggerButton) return
+        if (ev.button !== this.currentTriggerButton) return
 
         ev.target.releasePointerCapture?.(ev.pointerId)
-        this.isTracking = false
-
+        const triggeredBtn = this.currentTriggerButton
+        if (!this._next(ACTIONS.UP)) return
         const state = this.activeStrategy.processEnd(ev.clientX, ev.clientY)
         if (state.changed) {
-            this._invokeHook("onPathChange", { paths: state.paths, newDirection: state.newDirection, triggerButton: this.currentTriggerButton })
+            this._invokeHook("onPathChange", { paths: state.paths, newDirection: state.newDirection, triggerButton: triggeredBtn })
         }
-        this._invokeHook("onEnd", { paths: state.paths, gestureCode: state.paths.join(""), triggerButton: this.currentTriggerButton, originalEvent: ev })
-        this.currentTriggerButton = null
+        this._invokeHook("onEnd", { paths: state.paths, gestureCode: state.paths.join(""), triggerButton: triggeredBtn, originalEvent: ev })
     }
 
     _onPointerCancel = (ev) => {
-        if (this.isTracking) {
+        if (this.currentState === STATES.TRACKING) {
             ev.target.releasePointerCapture?.(ev.pointerId)
             this.abort("systemCancel")
         }
+    }
+
+    _onWindowLostFocus = () => {
+        if (this.currentState === STATES.TRACKING) this.abort("windowBlur")
     }
 }
 
 class PluginTimeout {
     id = "timeout"
-    watchdogTimer = null
+    timer = null
 
     constructor(options = {}) {
         this.options = { startTimeout: 1000, idleTimeout: 2000, pollInterval: 100, ...options }
@@ -436,30 +476,28 @@ class PluginTimeout {
     }
 
     _clearWatchdog = () => {
-        if (this.watchdogTimer) {
-            clearInterval(this.watchdogTimer)
-            this.watchdogTimer = null
-        }
-    }
-
-    _checkTimeout = () => {
-        const elapsed = performance.now() - this.engine.getLastMoveTimestamp()
-        if (this.engine.getHasMoved()) {
-            if (this.options.idleTimeout > 0 && elapsed >= this.options.idleTimeout) {
-                this.engine.abort("idleTimeout")
-            }
-        } else {
-            if (this.options.startTimeout > 0 && elapsed >= this.options.startTimeout) {
-                this.engine.abort("startTimeout")
-            }
+        if (this.timer) {
+            clearInterval(this.timer)
+            this.timer = null
         }
     }
 
     onStart = () => {
         this._clearWatchdog()
-        if (this.options.startTimeout > 0 || this.options.idleTimeout > 0) {
-            this.watchdogTimer = setInterval(this._checkTimeout, this.options.pollInterval)
-        }
+
+        const { startTimeout, idleTimeout, pollInterval } = this.options
+        const enableStart = startTimeout > 0
+        const enableIdle = idleTimeout > 0
+        if (!enableStart && !enableIdle) return
+
+        this.timer = setInterval(() => {
+            const elapsed = performance.now() - this.engine.getLastMoveTimestamp()
+            if (this.engine.hasMoved()) {
+                if (enableIdle && elapsed > idleTimeout) this.engine.abort("idleTimeout")
+            } else {
+                if (enableStart && elapsed > startTimeout) this.engine.abort("startTimeout")
+            }
+        }, pollInterval)
     }
 
     onEnd = () => this._clearWatchdog()
@@ -713,20 +751,24 @@ class PluginSensory {
     constructor(options = {}) {
         this.options = {
             enableAudio: true,
-            enableHaptic: false,
-            volFormatter: (paths, type) => {
-                const vols = { tick: 0.1, success: 0.1, error: 0.05, abort: 0.08 }
-                return vols[type] ?? 0.1
+            enableHaptic: true,
+            hapticProfile: (type, paths) => {
+                const profiles = { tick: 10, success: [15, 30, 20], error: [40, 30, 40], abort: [30, 40, 30] }
+                return profiles[type] ?? 0
             },
-            freqFormatter: (paths, type) => {
-                if (type !== "tick") return 600
-                const dir = paths[paths.length - 1]
-                const pitchMap = { "↑": 1200, "↗": 1050, "→": 900, "↘": 750, "↓": 600, "↙": 450, "←": 300, "↖": 750 }
-                return pitchMap[dir] || 600
-            },
-            vibrateFormatter: (paths, type) => {
-                const vibes = { tick: 10, success: [15, 30, 20], error: [40, 30, 40], abort: [30, 40, 30] }
-                return vibes[type] ?? 10
+            audioProfile: (type, paths) => {
+                if (type === "tick") {
+                    const dir = paths[paths.length - 1]
+                    const f = { "↑": 1200, "↗": 1050, "→": 900, "↘": 750, "↓": 600, "↙": 450, "←": 300, "↖": 750 }[dir] || 600
+                    return [{ freq: f, wave: "triangle", duration: 0.02, vol: 0.1 }]
+                }
+                if (type === "success") return [
+                    { freq: 600, wave: "sine", duration: 0.1, vol: 0.1 },
+                    { freq: 900, wave: "sine", duration: 0.15, vol: 0.1, delay: 80 },
+                ]
+                if (type === "error") return [{ freq: 200, wave: "square", duration: 0.15, vol: 0.05 }]
+                if (type === "abort") return [{ freq: 150, wave: "sawtooth", duration: 0.15, vol: 0.08 }]
+                return []
             },
             ...options,
         }
@@ -745,17 +787,48 @@ class PluginSensory {
         this.engine = null
     }
 
+    onStart = () => {
+        this._initAudio()
+        this._lastPathLength = 0
+    }
+
+    onPathChange = (payload) => {
+        if (payload.paths && payload.paths.length > this._lastPathLength) {
+            this._lastPathLength = payload.paths.length
+            this.play("tick", payload.paths)
+        }
+    }
+
+    onAbort = () => this.play("abort", [])
+
+    play = (type, paths = []) => {
+        if (this.options.enableHaptic) {
+            const hapticData = this.options.hapticProfile(type, paths)
+            if (hapticData) navigator.vibrate?.(hapticData)
+        }
+        if (this.options.enableAudio && this.audioCtx) {
+            this._initAudio()
+            const audioSequence = this.options.audioProfile(type, paths) || []
+            audioSequence.forEach(tone => {
+                if (tone.delay) setTimeout(() => this._playTone(tone), tone.delay)
+                else this._playTone(tone)
+            })
+        }
+    }
+    playSuccess = (paths = []) => this.play("success", paths)
+    playError = (paths = []) => this.play("error", paths)
+
     _initAudio = () => {
         if (this.audioCtx?.state === "suspended") {
             this.audioCtx.resume()
         }
     }
 
-    _playTone = (freq, type, duration, vol) => {
-        if (!this.audioCtx || !this.options.enableAudio || vol <= 0) return
+    _playTone = ({ freq, wave, duration, vol }) => {
+        if (!this.audioCtx || vol <= 0) return
         const osc = this.audioCtx.createOscillator()
         const gain = this.audioCtx.createGain()
-        osc.type = type
+        osc.type = wave
 
         const now = this.audioCtx.currentTime
         osc.frequency.setValueAtTime(freq, now)
@@ -768,79 +841,26 @@ class PluginSensory {
         osc.start(now)
         osc.stop(now + duration)
     }
-
-    _vibrate = (pattern) => {
-        if (this.options.enableHaptic) {
-            navigator.vibrate?.(pattern)
-        }
-    }
-
-    onStart = () => {
-        this._initAudio()
-        this._lastPathLength = 0
-    }
-
-    onPathChange = (payload) => {
-        const paths = payload.paths
-        if (!paths) return
-        if (paths.length > this._lastPathLength) {
-            this._lastPathLength = paths.length
-            const type = "tick"
-            const freq = this.options.freqFormatter(paths, type)
-            const vol = this.options.volFormatter(paths, type)
-            const vib = this.options.vibrateFormatter(paths, type)
-            this._playTone(freq, "triangle", 0.02, vol)
-            this._vibrate(vib)
-        }
-    }
-
-    onAbort = () => {
-        const paths = []
-        const type = "abort"
-        const vol = this.options.volFormatter(paths, type)
-        const vib = this.options.vibrateFormatter(paths, type)
-        this._playTone(150, "sawtooth", 0.15, vol)
-        this._vibrate(vib)
-    }
-
-    playSuccess = (paths = []) => {
-        this._initAudio()
-        const type = "success"
-        const vol = this.options.volFormatter(paths, type)
-        const vib = this.options.vibrateFormatter(paths, type)
-        this._playTone(600, "sine", 0.1, vol)
-        setTimeout(() => this._playTone(900, "sine", 0.15, vol), 80)
-        this._vibrate(vib)
-    }
-
-    playError = (paths = []) => {
-        this._initAudio()
-        const type = "error"
-        const vol = this.options.volFormatter(paths, type)
-        const vib = this.options.vibrateFormatter(paths, type)
-        this._playTone(200, "square", 0.15, vol)
-        this._vibrate(vib)
-    }
 }
 
-class PluginActionManager {
-    id = "actionManager"
-    actionRegistry = new Map()
+class PluginActionDispatcher {
+    id = "actionDispatcher"
+    actionRegistry = new Map()  // Map<String(Button), Map<String(Path), Action>>
     lastTriggerTimes = new WeakMap()
     static BUTTON_MAP = { middle: 1, right: 2, x1: 3, x2: 4 }
 
     constructor({ actions = [], ...options } = {}) {
         this.options = {
             globalCooldown: 0,
-            onBeforeAction: (context) => true,
-            onAfterAction: (context, result) => null,
-            onMissed: (context) => null,
-            onCooldown: (context, remain) => console.warn(`[Action Cooldown] ${context.action?.name || "Unknown"} wait ${remain}ms.`),
-            onConditionFailed: (context) => null,
-            onError: (context, err) => console.error(`[Action Error] ${context.action?.name || "Unknown"}:`, err),
+            onBeforeAction: (ctx) => true,
+            onAfterAction: (ctx, result) => null,
+            onMissed: (ctx) => null,
+            onCooldown: (ctx, remain) => console.warn(`[Cooldown] ${ctx.action?.name} wait ${remain}ms.`),
+            onConditionFailed: (ctx) => null,
+            onError: (ctx, err) => console.error(`[Error] ${ctx.action?.name}:`, err),
             ...options,
         }
-        actions.forEach(action => this.register(action))
+        actions.forEach(act => this.register(act))
     }
 
     install = (engine) => {
@@ -852,35 +872,42 @@ class PluginActionManager {
         this.engine = null
     }
 
-    _getMatchKey = ({ button, path }) => {
-        if (!path || typeof path !== "string") {
-            throw new TypeError(`[Gesture Error] Action requires a valid 'path' string.`)
-        }
-        if (button == null) return path
-
-        const code = typeof button === "number" ? button : this.constructor.BUTTON_MAP[String(button).toLowerCase()]
-        if (code === undefined) {
-            throw new TypeError(`[Gesture Error] Invalid button "${button}".`)
-        }
-        return `${code}:${path}`
+    _getBtnKey = (button) => {
+        if (button == null || String(button).toLowerCase() === "any") return "any"
+        const strBtn = String(button).toLowerCase()
+        return String(this.constructor.BUTTON_MAP[strBtn] || strBtn)
     }
 
     register = (actionDef) => {
         if (typeof actionDef.execute !== "function") {
             throw new TypeError(`[Gesture Error] Action missing 'execute' function.`)
         }
-        this.actionRegistry.set(this._getMatchKey(actionDef), actionDef)
+        if (!actionDef.path || typeof actionDef.path !== "string") {
+            throw new TypeError(`[Gesture Error] Action requires a valid 'path' string.`)
+        }
+
+        const btnKey = this._getBtnKey(actionDef.button)
+        if (!this.actionRegistry.has(btnKey)) {
+            this.actionRegistry.set(btnKey, new Map())
+        }
+        this.actionRegistry.get(btnKey).set(actionDef.path, actionDef)
         return this
     }
 
     unregister = (actionDef) => {
-        this.actionRegistry.delete(this._getMatchKey(actionDef))
+        const btnKey = this._getBtnKey(actionDef.button)
+        const innerMap = this.actionRegistry.get(btnKey)
+        if (innerMap) {
+            innerMap.delete(actionDef.path)
+            if (innerMap.size === 0) this.actionRegistry.delete(btnKey)
+        }
         return this
     }
 
     _resolveAction = (button, code) => {
         if (!code) return null
-        return this.actionRegistry.get(`${button}:${code}`) || this.actionRegistry.get(code) || null
+        const strBtn = String(button)
+        return this.actionRegistry.get(strBtn)?.get(code) || this.actionRegistry.get("any")?.get(code) || null
     }
 
     hasMatchedAction = (button, code) => !!this._resolveAction(button, code)
@@ -930,7 +957,6 @@ class MouseGesturesPlugin extends BasePlugin {
 
     initEngine = () => {
         const BUTTONS = ["left", "middle", "right", "x1", "x2"]
-        const BUTTON_NAMES = this.i18n.array(BUTTONS, "$option.GESTURES.button.")
         const ACTIONS = new Map(
             this.config.GESTURES
                 .filter(g => g.enable && BUTTONS.includes(g.button) && typeof g.execute === "string" && /^[→←↑↓↘↙↗↖]+$/u.test(g.path))
@@ -943,12 +969,6 @@ class MouseGesturesPlugin extends BasePlugin {
                 .filter(Boolean),
         )
         const getTriggerButtons = (triggers) => triggers.map(btn => BUTTONS.indexOf(btn)).filter(x => x !== -1)
-        const getSuppressFn = () => {
-            const modifier = this.config.SUPPRESSION_KEY
-            if (!modifier) return null
-            const key = `${modifier}Key`
-            return (ev) => ev[key] === true
-        }
         const getStrategy = (name) => {
             const isLinear = this.config.HYSTERESIS === 0
             const strategies = isLinear
@@ -963,11 +983,16 @@ class MouseGesturesPlugin extends BasePlugin {
         const engine = new GestureEngine({
             triggerButtons: getTriggerButtons(this.config.TRIGGER_BUTTONS),
             strategy: getStrategy(this.config.STRATEGY),
-            allowedPointerTypes: ["mouse"],
+            allowedPointerTypes: this.config.POINTER_TYPES,
         })
 
-        engine.use(new PluginTimeout({ startTimeout: this.config.START_TIMEOUT, idleTimeout: this.config.IDLE_TIMEOUT }))
-            .use(new PluginSuppressor({ suppressorFn: getSuppressFn() }))
+        if (this.config.START_TIMEOUT > 0 || this.config.IDLE_TIMEOUT > 0) {
+            engine.use(new PluginTimeout({ startTimeout: this.config.START_TIMEOUT, idleTimeout: this.config.IDLE_TIMEOUT }))
+        }
+        if (this.config.SUPPRESSION_KEY) {
+            const key = `${this.config.SUPPRESSION_KEY}Key`
+            engine.use(new PluginSuppressor({ suppressorFn: (ev) => ev[key] === true }))
+        }
         if (this.config.ENABLE_VISUALIZER) {
             engine.use(new PluginVisualizer(document.getElementById("plugin-mouse-gestures-visualizer"), {
                 lineWidth: this.config.TRAJECTORY_LINE_WIDTH,
@@ -980,14 +1005,16 @@ class MouseGesturesPlugin extends BasePlugin {
                 textFormatter: (paths, btn) => {
                     if (paths.length === 0) return ""
                     const code = paths.join("")
-                    return ACTIONS.get(`${btn}:${code}`)?.name || `[${BUTTON_NAMES[btn]}] ${code}`
+                    return ACTIONS.get(`${btn}:${code}`)?.name || code
                 },
             }))
         }
         if (this.config.ENABLE_SENSORY) {
-            engine.use(new PluginSensory())
+            engine.use(new PluginSensory({ enableAudio: true, enableHaptic: false }))
         }
-        engine.use(new PluginActionManager({ actions: [...ACTIONS.values()], globalCooldown: this.config.COOLDOWN }))
+        if (ACTIONS.size) {
+            engine.use(new PluginActionDispatcher({ globalCooldown: this.config.COOLDOWN, actions: [...ACTIONS.values()] }))
+        }
 
         return engine
     }
