@@ -50,12 +50,11 @@ class PreferencesPlugin extends BasePlugin {
                 targetEle: title,
                 moveEle: dialog,
                 onMouseDown: () => {
-                    const { transform } = window.getComputedStyle(dialog)
-                    if (transform !== "none") {
-                        const { left, top } = dialog.getBoundingClientRect()
-                        dialog.style.left = `${left}px`
-                        dialog.style.top = `${top}px`
-                        dialog.style.transform = "none"
+                    if (!dialog.classList.contains("is-dragged")) {
+                        const rect = dialog.getBoundingClientRect()
+                        dialog.style.left = `${Math.round(rect.left)}px`
+                        dialog.style.top = `${Math.round(rect.top)}px`
+                        dialog.classList.add("is-dragged")
                     }
                 },
             })
