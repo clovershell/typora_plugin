@@ -148,7 +148,7 @@ const PLUGIN_VENDORS_CONFIG = {
             assets: { "toastui-calendar.min.css": "dist/toastui-calendar.min.css" },
         }
     }),
-    "abc": pluginVendor.copyNpm({ pkgName: "abcjs", files: { "plugin/abc/abcjs-basic-min.js": "dist/abcjs-basic-min.js" } }),
+    "abc": pluginVendor.download({ files: { "plugin/abc/abcjs-basic-min.js": "https://raw.githubusercontent.com/paulrosen/abcjs/refs/heads/main/dist/abcjs-basic-min.js" } }),
     "chart": pluginVendor.download({ files: { "plugin/chart/chart.min.js": "https://cdn.jsdelivr.net/npm/chart.js" } }),
     "echarts": pluginVendor.download({ files: { "plugin/echarts/echarts.min.js": "https://raw.githubusercontent.com/apache/echarts/refs/heads/master/dist/echarts.min.js" } }),
     "wavedrom": pluginVendor.download({ files: { "plugin/wavedrom/wavedrom.min.js": "https://cdnjs.cloudflare.com/ajax/libs/wavedrom/3.5.0/wavedrom.unpkg.min.js" } }),
