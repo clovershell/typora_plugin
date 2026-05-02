@@ -380,7 +380,7 @@ class TOCMarkmap {
                     field("RETAIN_FOLD_STATE_ON_UPDATE", "switch"),
                     field("AUTO_FIT_ON_UPDATE", "switch"),
                     field("AUTO_FIT_WHEN_FOLD", "switch"),
-                    field("AUTO_COLLAPSE_PARAGRAPH_ON_FOLD", "switch", { tooltip: "experimental", disabled: !pluginEnabled, readonly: pluginEnabled }),
+                    field("AUTO_COLLAPSE_PARAGRAPH_ON_FOLD", "switch", { tooltip: "experimental", disabled: !pluginEnabled }),
                 ),
                 titledBox(
                     "title.download",
