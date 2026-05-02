@@ -1244,14 +1244,14 @@ describe("FastForm Feature_DSLEngine & Feature_StandardDSL", () => {
         assert.strictEqual(usernameField.label, "Username", "Chainable .Label() should set the label property")
     })
 
-    it("should construct complex dependency structures properly using the Dep utility", () => {
+    it("should construct complex dependency structures properly using the When utility", () => {
         ff.render({
-            schema: ({ Group, Controls, Dep }) => [
+            schema: ({ Group, Controls, When }) => [
                 Group("Dependencies",
                     Controls.Text("targetField")
-                        .ShowIf(Dep.and(
-                            Dep.eq("role", "admin"),
-                            Dep.or(Dep.eq("status", "active"), Dep.true("isOverride"))
+                        .ShowIf(When.and(
+                            When.eq("role", "admin"),
+                            When.or(When.eq("status", "active"), When.true("isOverride"))
                         ))
                 )
             ],
@@ -1269,7 +1269,7 @@ describe("FastForm Feature_DSLEngine & Feature_StandardDSL", () => {
         assert.deepStrictEqual(
             targetField.dependencies,
             expectedDependencies,
-            "Dep utility should generate a correct, deeply nested dependency AST"
+            "When utility should generate a correct, deeply nested dependency AST"
         )
     })
 
@@ -1319,20 +1319,19 @@ describe("FastForm Feature_DSLEngine & Feature_StandardDSL", () => {
     it("should correctly resolve dynamically appended nested schemas via .Tab()", () => {
         ff.render({
             schema: ({ Group, Controls }) => [
-                Group(
-                    Controls.Tabs("configTabs")
-                        .TabPosition("left")
-                        .Tab({
-                            label: "Network",
-                            value: "network",
-                            schema: [Group(Controls.Text("ip").Label("IP Address"))]
-                        })
-                        .Tab({
-                            label: "Security",
-                            value: "security",
-                            schema: [Group(Controls.Switch("firewall").Label("Enable Firewall"))]
-                        })
-                )
+                Controls
+                    .Tabs("configTabs")
+                    .TabPosition("left")
+                    .Tab({
+                        label: "Network",
+                        value: "network",
+                        schema: [Controls.Text("ip").Label("IP Address")]
+                    })
+                    .Tab({
+                        label: "Security",
+                        value: "security",
+                        schema: [Controls.Switch("firewall").Label("Enable Firewall")]
+                    })
             ],
             data: {}
         })
@@ -1354,7 +1353,7 @@ describe("FastForm Feature_DSLEngine & Feature_StandardDSL", () => {
     it("should not handle custom props", () => {
         assert.throws(() => ff.render({
             // "CustomProp" is not explicitly defined in BaseSpecs
-            schema: ({ Group, Controls }) => [Group(Controls.Text("field1").CustomProp("custom_value"))],
+            schema: ({ Group, Controls }) => [Controls.Text("field1").CustomProp("custom_value")],
             data: {}
         }), TypeError)
     })
@@ -1637,18 +1636,13 @@ describe("FastForm Controls", () => {
 
             await flushMicrotasks()
 
-            const hotkeyInput = ff.form.querySelector(".hotkey-input")
-
-            // Simulate pressing Ctrl+Shift+S
             const keydownEvent = new window.Event("keydown", { bubbles: true })
             keydownEvent.key = "s"
             keydownEvent.ctrlKey = true
             keydownEvent.shiftKey = true
-
-            hotkeyInput.dispatchEvent(keydownEvent)
-            await flushMicrotasks() // Wait for the debounce logic defined in Control_Hotkey (if any) or normal cycles
-
-            assert.strictEqual(hotkeyInput.value, "ctrl+shift+s", "Input value should reflect the formatted key combination")
+            const input = ff.form.querySelector(".hotkey-recorder")
+            input.dispatchEvent(keydownEvent)
+            assert.strictEqual(ff.form.querySelector(".hotkey-wrap").dataset.value, "ctrl+shift+s", "Input value should reflect the formatted key combination")
         })
     })
 })

@@ -12,7 +12,7 @@ class MarkdownlintPlugin extends BasePlugin {
                 name = /^md\d{3}$/i.test(name) ? name.toUpperCase() : name.toLowerCase()
                 name = mapAliasToName[name] ?? name
                 return [name, option]
-            })
+            }),
         )
     }
 
@@ -65,12 +65,11 @@ class MarkdownlintPlugin extends BasePlugin {
             const infoList = infos.map(info => this.utils.pick(info, attrs))
             const value = infoList.length === 1 ? infoList[0] : infoList
             const content = JSON.stringify(value, null, "\t")
-            const op = {
+            await this.utils.formDialog.modal({
                 title: this.i18n.t("$option.TITLE_BAR_BUTTONS.detailAll"),
-                schema: [{ fields: [{ type: "textarea", key: "detail", rows: 14, readonly: true }] }],
-                data: { detail: content }
-            }
-            await this.utils.formDialog.modal(op)
+                schema: ({ Controls }) => [Controls.Textarea("detail").Rows(14).Readonly(true)],
+                data: { detail: content },
+            })
         }
 
         const funcMap = {
@@ -216,7 +215,7 @@ class MarkdownlintPlugin extends BasePlugin {
                     this.config = settings[this.fixedName]
                     this.utils.notification.show(this.i18n.t("success.restore"))
                     await this.utils.formDialog.refresh(op => op.data = getData())
-                }
+                },
             }),
         })
 
@@ -277,9 +276,9 @@ class MarkdownlintPlugin extends BasePlugin {
     _initTableColumns = () => {
         const [useInfo, useLocate, useFix] = ["info", "locate", "fix"].map(t => this.config.TOOLS.includes(t))
         const opsRender = (rowData) => {
-            const infoEl = useInfo ? '<i class="fa fa-info-circle action-icon" action="detailSingle"></i>' : ""
-            const locateEl = useLocate ? '<i class="fa fa-crosshairs action-icon" action="jumpToLine"></i>' : ""
-            const fixEl = (useFix && rowData.fixable) ? '<i class="fa fa-wrench action-icon" action="fixSingle"></i>' : ""
+            const infoEl = useInfo ? `<i class="fa fa-info-circle action-icon" action="detailSingle"></i>` : ""
+            const locateEl = useLocate ? `<i class="fa fa-crosshairs action-icon" action="jumpToLine"></i>` : ""
+            const fixEl = (useFix && rowData.fixable) ? `<i class="fa fa-wrench action-icon" action="fixSingle"></i>` : ""
             return [infoEl, locateEl, fixEl].join("")
         }
         const sortKey = { index: "idx", lineNumber: "line", ruleName: "rule", ruleDesc: "desc" }[this.config.RESULT_ORDER_BY] || "line"
@@ -292,7 +291,7 @@ class MarkdownlintPlugin extends BasePlugin {
         }
         const schema = {
             defaultSort: { key: sortKey, direction: "asc" },
-            columns: this.config.COLUMNS.map(col => supportedColumns[col])
+            columns: this.config.COLUMNS.map(col => supportedColumns[col]),
         }
         this.entities.table.setSchema(schema)
     }
@@ -319,5 +318,5 @@ class MarkdownlintPlugin extends BasePlugin {
 }
 
 module.exports = {
-    plugin: MarkdownlintPlugin
+    plugin: MarkdownlintPlugin,
 }

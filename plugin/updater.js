@@ -14,19 +14,14 @@ class UpdaterPlugin extends BasePlugin {
             await this.manualUpdate()
             return
         }
-        const proxy = await this.getProxy()
-        const label = this.i18n.t("$label.PROXY")
-        const hintHeader = this.i18n.t("hintHeader.PROXY")
-        const hintDetail = this.i18n.t("hintDetail.PROXY")
-        const op = {
+        const { response, data } = await this.utils.formDialog.modal({
             title: this.pluginName,
-            schema: [
-                { fields: [{ type: "hint", hintHeader, hintDetail }] },
-                { fields: [{ type: "text", key: "proxy", label, placeholder: "http://127.0.0.1:7890" }] },
+            schema: ({ Controls }) => [
+                Controls.Hint().HintHeader(this.i18n.t("hintHeader.PROXY")).HintDetail(this.i18n.t("hintDetail.PROXY")),
+                Controls.Text("proxy").Label(this.i18n.t("$label.PROXY")).Placeholder("http://127.0.0.1:7890"),
             ],
-            data: { proxy },
-        }
-        const { response, data } = await this.utils.formDialog.modal(op)
+            data: { proxy: await this.getProxy() },
+        })
         if (response === 1) {
             await this.manualUpdate(data.proxy)
         }
@@ -72,13 +67,11 @@ class UpdaterPlugin extends BasePlugin {
             detail = I18N.unknownError
         }
         this.utils.notification.show(msg, msgType, 10000)
-
-        const op = {
+        await this.utils.formDialog.modal({
             title: this.pluginName,
-            schema: [{ fields: [{ type: "code", key: "detail" }] }],
+            schema: ({ Controls }) => [Controls.Code("detail")],
             data: { detail },
-        }
-        await this.utils.formDialog.modal(op)
+        })
     }
 
     getProxy = async (userProxy) => {
@@ -348,11 +341,11 @@ const getSysProxy = () => {
             stdout => {
                 const groups = stdout.match(/ProxyEnable.+?0x(?<enable>\d)\r\n.+?ProxyServer\s+REG_SZ\s+(?<proxy>.*)/i)?.groups
                 return (groups?.enable === "1") ? groups.proxy : null
-            }
+            },
         )
     }
     if (File.isMac) {
-        return _get('networksetup -getwebproxy "Wi-Fi"', stdout => {
+        return _get(`networksetup -getwebproxy "Wi-Fi"`, stdout => {
             const [_, enable, server, port] = stdout.match(/Enabled: (.+)\nServer: (.+)\nPort: (.+)\n/i) || []
             return (enable === "Yes" && server && port) ? `${server}:${port}` : null
         })
@@ -361,5 +354,5 @@ const getSysProxy = () => {
 }
 
 module.exports = {
-    plugin: UpdaterPlugin
+    plugin: UpdaterPlugin,
 }

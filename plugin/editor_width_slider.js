@@ -30,7 +30,7 @@ class EditorWidthSliderPlugin extends BasePlugin {
                     Controls.Range("width").Label(this.i18n.t("$label.WIDTH_RATIO")).Min(30).Max(100),
                     Controls.Switch("tmpAdjust").Label(this.i18n.t("tmpAdjust")),
                 ),
-                Group(Controls.Action("restore").Label(this.i18n.t("restore"))),
+                Controls.Action("restore").Label(this.i18n.t("restore")),
             ],
             data: {
                 width: this._getWidth(),

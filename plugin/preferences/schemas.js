@@ -1,607 +1,169 @@
 /**
- * @typedef {Object} TooltipConfig
- * @property {string} action
- * @property {string} [icon]
- * @property {string} [text]
- * @property {*} [data]
+ * @file Preference Form Schemas
+ *
+ * This file defines the UI configurations for plugin preference panels using a fluent, declarative DSL.
+ *
+ * === The Dual-State Builder ===
+ * Controls in this DSL are strictly context-aware. You use the exact same syntax (e.g., `Textarea("CMD")`)
+ * everywhere, and the engine automatically adapts its structure based on where you place it:
+ *   1. **As an Independent Box**: When placed directly at the root of a schema or inside structural
+ * arrays (like `NestedBoxes`), the control renders as a standalone block with its own title and layout.
+ *   2. **As an Inline Field**: When wrapped inside a `Group(...)`, the control automatically sheds its
+ * outer wrapper and seamlessly degrades into an inline input field, sitting alongside its siblings.
  */
 
-/** @typedef {string | TooltipConfig | Array<string|TooltipConfig>} ITooltip */
+const OPTION_SCOPE = Symbol("Schema:OptionScope")
+const I18N_DICT = Symbol("Schema:I18nDict")
 
-/**
- * @typedef {Object} BaseProps
- * @property {string} [label]
- * @property {ITooltip} [tooltip]
- * @property {string} [explain]
- * @property {boolean} [hidden]
- * @property {boolean} [disabled]
- * @property {Object} [dependencies]
- * @property {"hide"|"readonly"} [dependencyUnmetAction="readonly"]
- * @property {string} [className]
- */
+let Group, When
+let Switch, Text, Password, Color, Integer, Float, Icon, Range, Action, Static, Hint, Divider,
+    Hotkey, Textarea, Code, Select, Segment, Radio, Checkbox, Transfer, Dict, Palette, Table,
+    Object_, Array_
 
-/** @typedef {BaseProps & { placeholder?: string, readonly?: boolean }} InputProps */
-/** @typedef {InputProps & { min?: number, max?: number, step?: number, isInteger?: boolean }} NumberProps */
-/** @typedef {BaseProps & { minItems?: number, maxItems?: number, disabledOptions?: string[] }} OptionsProps */
+let Deps, Frag
 
-/** @typedef {{ key?: string } & BaseProps} IField */
+let initialized = false
 
-/**
- * @param {string} key
- * @param {string} type
- * @param {IField} [props]
- */
-const Field = (key, type, props = {}) => ({ type, key, label: key, ...props })
+const initDSL = (dsl) => {
+    if (initialized) return
+    initialized = true
 
-/**
- * @param {string} key
- * @param {BaseProps & { actionType?: "function"|"toggle"|"trigger", activeClass?: string }} [props]
- */
-const Action = (key, props = {}) => Field(key, "action", props)
+    ;({ Group, When } = dsl)
 
-/**
- * @param {string} key
- * @param {BaseProps & { content?: string }} [props]
- */
-const Static = (key, props = {}) => Field(key, "static", props)
+    const withDefaults = {
+        Hint: (builder) => (...args) => builder(...args).Unsafe(false),
+        Array: (builder) => (...args) => builder(...args).AllowDuplicates(false),
+        Palette: (builder) => (...args) => builder(...args).Dimensions(1).AllowJagged(true).DefaultColor("#FFFFFF"),
+        Table: (builder) => (...args) => builder(...args).SubFormOptions("boxDependencyUnmetAction", "readonly").SubFormOptions("collapsibleBox", false),
+    }
+    const withI18n = (builder) => (key, ...args) => {
+        const instance = builder(key, ...args)
+        if (key !== undefined) {
+            instance.Label(key)
+            instance[I18N_DICT] = "label"
+        }
+        return instance
+    }
 
-/**
- * @param {string} key
- * @param {BaseProps & { readonly?: boolean }} [props]
- */
-const Switch = (key, props = {}) => Field(key, "switch", props)
+    const enhancedControls = Object.fromEntries(
+        Object.entries(dsl.Controls).map(([name, builder]) => [
+            name,
+            withI18n(withDefaults[name]?.(builder) ?? builder),
+        ]))
 
-/**
- * @param {string} key
- * @param {InputProps} [props]
- */
-const Text = (key, props = {}) => Field(key, "text", props)
+    ;({
+        Switch, Text, Password, Color, Integer, Float, Icon, Range, Action, Static, Hint, Divider,
+        Hotkey, Textarea, Code, Select, Segment, Radio, Checkbox, Transfer, Dict, Palette, Table,
+        Object: Object_, Array: Array_,
+    } = enhancedControls)
 
-/**
- * @param {string} key
- * @param {InputProps} [props]
- */
-const Password = (key, props = {}) => Field(key, "password", props)
+    const { preset, presetFor } = dsl.Extend
+    preset("ActionTooltip", (control, action, icon = "fa fa-link", text = undefined) => control.Tooltip({ action, icon, text }))
+    presetFor(["integer", "float", "range"], "Percent", control => control.Min(1).Max(100).Step(1))
+    presetFor(["integer", "float", "range"], "AllowMinusOne", control => control.Min(-1).Tooltip("minusOneMeansUnlimited"))
+    presetFor(["switch", "text", "password"], "Protect", control => control.ActionTooltip("openSettingsFolder", "fa fa-gear", "protected").Disabled(true))
+    presetFor(["select", "segment", "radio", "checkbox", "transfer"], "OptionScope", (control, scope) => control.fields[0][OPTION_SCOPE] = scope)
+    presetFor(["table"], "Headers", (control, headers) => control.ThMap(Object.fromEntries(headers.map(th => [th, `${control.fields[0].key}.${th}`]))))
 
-/**
- * @param {string} key
- * @param {InputProps} [props]
- */
-const Color = (key, props = {}) => Field(key, "color", props)
+    Deps = {
+        markmapToc: When.true("ENABLE_TOC_MARKMAP"),
+        markmapFence: When.true("ENABLE_FENCE_MARKMAP"),
+        fenceEnhanceButton: When.true("ENABLE_BUTTON"),
+        fenceEnhanceHotkey: When.true("ENABLE_HOTKEY"),
+        countFile: When.true("ENABLE_FILE_COUNT"),
+        gesturesDisplay: (btn) => When.and(When.or(When.true("ENABLE_VISUALIZER"), When.true("ENABLE_HUD")), When.contains("TRIGGER_BUTTONS", btn)),
+    }
 
-/**
- * @param {string} key
- * @param {InputProps} [props]
- */
-const Hotkey = (key, props = {}) => Field(key, "hotkey", props)
-
-/**
- * @param {string} key
- * @param {NumberProps & { unit?: string }} [props]
- */
-const Number_ = (key, props = {}) => Field(key, props.unit ? "unit" : "number", props)
-
-/**
- * @param {string} key
- * @param {NumberProps} [props]
- */
-const Integer = (key, props = {}) => Number_(key, { isInteger: true, ...props })
-
-/**
- * @param {string} key
- * @param {NumberProps} [props]
- */
-const Float = (key, props = {}) => Number_(key, { isInteger: false, ...props })
-
-/**
- * @param {string} key
- * @param {InputProps} [props]
- */
-const Icon = (key, props = {}) => Field(key, "icon", props)
-
-/**
- * @param {string} key
- * @param {NumberProps} [props]
- */
-const Range = (key, props = {}) => Field(key, "range", props)
-
-/**
- * @param {string} key
- * @param {string[] | Record<string, string>} options
- * @param {OptionsProps & { labelJoiner?: string }} [props]
- */
-const Select = (key, options, props = {}) => Field(key, "select", { options, ...props })
-
-/**
- * @param {string} key
- * @param {Object[]} subSchema
- * @param {Object} defaultValues
- * @param {BaseProps & { readonly?: boolean }} [props]
- */
-const Composite = (key, subSchema, defaultValues, props = {}) => Field(key, "composite", { subSchema, defaultValues, ...props })
-
-/**
- * @param {Object[]} tabs
- * @param {string} tabs.label
- * @param {string} tabs.icon
- * @param {string} tabs.value
- * @param {Object[]} tabs.schema
- * @param {BaseProps & { tabStyle?: "line"|"card"|"segment", tabPosition?: "top"|"left", defaultSelectedTab?: string }} [props]
- */
-const Tabs = (tabs, props = {}) => Field(String(Date.now()), "tabs", { tabs, ...props })
-
-/**
- * @param {string} key
- * @param {BaseProps & { rows?: number, noResize?: boolean, format?: "JSON"|"TOML"|"YAML" }} [props]
- */
-const Object_ = (key, props = {}) => Field(key, "object", { isBlockLayout: false, rows: 10, ...props })
-
-/**
- * @param {string} key
- * @param {BaseProps & { rows?: number, cols?: number, noResize?: boolean, placeholder?: string }} [props]
- */
-const Textarea = (key, props = {}) => Field(key, "textarea", { isBlockLayout: false, rows: 10, ...props })
-
-/**
- * @param {string} key
- * @param {BaseProps & { tabSize?: number, lineNumbers?: boolean, placeholder?: string }} [props]
- */
-const Code = (key, props = {}) => Field(key, "code", { isBlockLayout: false, ...props })
-
-/**
- * @param {string} key
- * @param {string[] | Record<string, string>} options
- * @param {BaseProps & { columns?: number, disabledOptions?: string[] }} [props]
- */
-const Radio = (key, options, props = {}) => Field(key, "radio", { isBlockLayout: false, options, columns: 1, ...props })
-
-/**
- * @param {string} key
- * @param {string[] | Record<string, string>} options
- * @param {OptionsProps & { columns?: number }} [props]
- */
-const Checkbox = (key, options, props = {}) => Field(key, "checkbox", { isBlockLayout: false, options, columns: 1, ...props })
-
-/**
- * @param {string} key
- * @param {BaseProps & { allowDuplicates?: boolean, dataType?: "string"|"number" }} [props]
- */
-const Array_ = (key, props = {}) => Field(key, "array", { isBlockLayout: false, allowDuplicates: false, ...props })
-
-/**
- * @param {string} key
- * @param {string[] | Record<string, string>} options
- * @param {OptionsProps & { titles?: [string, string], defaultHeight?: string }} [props]
- */
-const Transfer = (key, options, props = {}) => Field(key, "transfer", { isBlockLayout: false, options, ...props })
-
-/**
- * @param {string} key
- * @param {BaseProps & { dimensions?: 1|2, allowJagged?: boolean, defaultColor?: string }} [props]
- */
-const Palette = (key, props = {}) => Field(key, "palette", { isBlockLayout: false, dimensions: 1, allowJagged: true, defaultColor: "#FFFFFF", ...props })
-
-/**
- * @param {string} key
- * @param {Object} options
- * @param {BaseProps & { keyPlaceholder?: string, valuePlaceholder?: string, allowAddItem?: boolean }} [props]
- */
-const Dict = (key, options, props = {}) => Field(key, "dict", { isBlockLayout: false, options, ...props })
-
-/**
- * @param {string} key
- * @param {string[]} headers
- * @param {Object[]} nestedBoxes
- * @param {Object} defaultValues
- * @param {BaseProps} [props]
- */
-const Table = (key, headers, nestedBoxes, defaultValues, props = {}) => {
-    const thMap = Object.fromEntries(headers.map(th => [th, `${key}.${th}`]))
-    return Field(key, "table", { isBlockLayout: false, nestedBoxes, defaultValues, thMap, ...props })
+    Frag = {
+        PluginBase: (hasHotkey = false) => Group([
+            Switch("ENABLE"),
+            Text("NAME").Placeholder("defaultIfEmpty"),
+            hasHotkey ? Hotkey("HOTKEY") : null,
+        ]),
+        SettingHandler: () => Group(
+            Action("inspectRuntimeSettings").ActionTooltip("inspectDefaultSettings", "fa fa-codepen"),
+            Action("restoreSettings"),
+        ),
+        LangMode: () => Group("languageMode", Text("LANGUAGE").Protect(), Switch("INTERACTIVE_MODE")),
+        ChartStyle: () => Group("diagramStyle", Text("DEFAULT_FENCE_HEIGHT"), Text("DEFAULT_FENCE_BACKGROUND_COLOR")),
+        Template: () => Code("TEMPLATE"),
+    }
 }
 
-/**
- * @param {string} hintHeader
- * @param {string} hintDetail
- * @param {BaseProps & { hintHeader?: string, hintDetail?: string, unsafe?: boolean }} [props]
- */
-const Hint = (hintHeader, hintDetail, props = {}) => ({ type: "hint", hintHeader, hintDetail, unsafe: false, ...props })
-
-/**
- * @param {string} divider
- * @param {BaseProps & { position?: "center"|"left"|"right", dashed?: boolean }} [props]
- */
-const Divider = (divider, props = {}) => ({ type: "divider", divider, ...props })
-
-/**
- * @param {string} content
- * @param {BaseProps & { content?: string, unsafe?: boolean }} [props]
- */
-const Custom = (content, props = {}) => ({ type: "custom", content, unsafe: false, ...props })
-
-/**
- * @typedef {Object} BoxProps
- * @property {string} [label]
- * @property {ITooltip} [tooltip]
- * @property {Object} [dependencies]
- * @property {"hide"|"readonly"} [dependencyUnmetAction="hide"]
- */
-
-/**
- * @param {string} key
- * @param {string} type
- * @param {BoxProps} [props]
- * @returns {Object}
- */
-const SingleFieldBox = (key, type, props = {}) => {
-    const { tooltip, dependencies, ...fieldProps } = props
-    const base = { label: key, fields: [{ type, key, ...fieldProps }] }
-    return Object.assign(base, tooltip && { tooltip }, dependencies && { dependencies })
+const Units = {
+    byte: "byte", centimeter: "centimeter", degree: "degree", em: "em", inch: "inch", item: "item",
+    line: "line", millisecond: "millisecond", percent: "percent", pixel: "pixel", second: "second",
 }
 
-/**
- * @param {string} key
- * @param {BoxProps & { rows?: number, noResize?: boolean, format?: string }} [props]
- */
-const ObjectBox = (key, props = {}) => SingleFieldBox(key, "object", { rows: 10, ...props })
-
-/**
- * @param {string} key
- * @param {BoxProps & { rows?: number, cols?: number, placeholder?: string }} [props]
- */
-const TextareaBox = (key, props = {}) => SingleFieldBox(key, "textarea", { rows: 10, ...props })
-
-/**
- * @param {string} key
- * @param {BaseProps & { tabSize?: number, lineNumbers?: boolean, placeholder?: string }} [props]
- */
-const CodeBox = (key, props = {}) => SingleFieldBox(key, "code", { ...props })
-
-/**
- * @param {string} key
- * @param {Object} options
- * @param {BoxProps & { columns?: number, disabledOptions?: string[] }} [props]
- */
-const RadioBox = (key, options, props = {}) => SingleFieldBox(key, "radio", { options, columns: 1, ...props })
-
-/**
- * @param {string} key
- * @param {Object} options
- * @param {BoxProps & OptionsProps & { columns?: number }} [props]
- */
-const CheckboxBox = (key, options, props = {}) => SingleFieldBox(key, "checkbox", { options, columns: 1, ...props })
-
-/**
- * @param {string} key
- * @param {BoxProps & { allowDuplicates?: boolean, dataType?: "string"|"number" }} [props]
- */
-const ArrayBox = (key, props = {}) => SingleFieldBox(key, "array", { allowDuplicates: false, ...props })
-
-/**
- * @param {string} key
- * @param {Object} options
- * @param {BoxProps & OptionsProps} [props]
- */
-const TransferBox = (key, options, props = {}) => SingleFieldBox(key, "transfer", { options, ...props })
-
-/**
- * @param {string} key
- * @param {BoxProps & { dimensions?: 1|2, allowJagged?: boolean, defaultColor?: string }} [props]
- */
-const PaletteBox = (key, props = {}) => SingleFieldBox(key, "palette", { dimensions: 1, allowJagged: true, defaultColor: "#FFFFFF", ...props })
-
-/**
- * @param {string} key
- * @param {Object} options
- * @param {BoxProps & { keyPlaceholder?: string, valuePlaceholder?: string }} [props]
- */
-const DictBox = (key, options, props = {}) => SingleFieldBox(key, "dict", { options, ...props })
-
-/**
- * @param {string} key
- * @param {string[]} headers
- * @param {Object[]} nestedBoxes
- * @param {Object} defaultValues
- * @param {BoxProps} [props]
- */
-const TableBox = (key, headers, nestedBoxes, defaultValues, props = {}) => {
-    const thMap = Object.fromEntries(headers.map(th => [th, `${key}.${th}`]))
-    return SingleFieldBox(key, "table", { nestedBoxes, defaultValues, thMap, boxDependencyUnmetAction: "readonly", ...props })
+const Opts = {
+    textStylizeTools: ["weight", "italic", "underline", "throughline", "overline", "superScript", "subScript", "emphasis", "blur", "title", "increaseSize", "decreaseSize", "increaseLetterSpacing", "decreaseLetterSpacing", "family", "foregroundColor", "backgroundColor", "borderColor", "erase", "blank", "setBrush", "useBrush"],
+    imageViewerTools: ["close", "download", "scroll", "play", "location", "nextImage", "previousImage", "firstImage", "lastImage", "thumbnailNav", "waterfall", "zoomIn", "zoomOut", "rotateLeft", "rotateRight", "hFlip", "vFlip", "translateLeft", "translateRight", "translateUp", "translateDown", "incHSkew", "decHSkew", "incVSkew", "decVSkew", "originSize", "fitScreen", "autoSize", "restore", "info", "dummy"],
 }
 
-/**
- * @param {...IField} fields
- */
-const UntitledBox = (...fields) => ({ fields })
-
-/**
- * @param {string} title
- * @param {...IField} fields
- */
-const TitledBox = (title, ...fields) => ({ title, fields })
-
-/**
- * @param {string} title
- * @param {ITooltip} tooltip
- * @param {...IField} fields
- */
-const TitledTipBox = (title, tooltip, ...fields) => ({ title, tooltip, fields })
-
-/******** Dependency Helper ********/
-// MORE: See `comparisonEvaluators` in `Feature_Watchers` in fast-form.js
-const Dep = {
-    true: (key) => ({ [key]: true }),
-    false: (key) => ({ [key]: false }),
-    follow: (key) => ({ $follow: key }),
-    eq: (key, expected) => ({ [key]: expected }),
-    ne: (key, expected) => ({ [key]: { $ne: expected } }),
-    gt: (key, expected) => ({ [key]: { $gt: expected } }),
-    lt: (key, expected) => ({ [key]: { $lt: expected } }),
-    bool: (key, expected) => ({ [key]: { $bool: expected } }),
-    contains: (key, expected) => ({ [key]: { $contains: expected } }),
-    or: (...conditions) => ({ $or: conditions }),
-    and: (...conditions) => ({ $and: conditions }),
-}
-
-/******** Tooltip Helper ********/
-// MORE: See `Feature_InteractiveTooltip` in fast-form.js
-const Tip = {
-    info: (text) => text,
-    custom: (text, icon) => ({ text, icon }),
-    action: (action, icon = "fa fa-link", text = undefined) => ({ action, icon, text }),
-}
-
-/******** Prop Unit (for Number_/Integer/Float only) ********/
-const UNITS = {
-    byte: "byte",
-    pixel: "pixel",
-    millisecond: "millisecond",
-    second: "second",
-    inch: "inch",
-    centimeter: "centimeter",
-    item: "item",
-    line: "line",
-    percent: "percent",
-    degree: "degree",
-    em: "em",
-}
-
-const TITLES = {
-    languageMode: "languageMode",
-    diagramStyle: "diagramStyle",
-    hotkey: "hotkey",
-    style: "style",
-    advanced: "advanced",
-}
-
-/******** Common ********/
-const PROPS = {
-    percent: { min: 1, max: 100, step: 1 },
-    protected: { tooltip: Tip.action("openSettingsFolder", "fa fa-gear", "protected"), disabled: true },
-    minusOne: { tooltip: "minusOneMeansUnlimited", min: -1 },
-}
-
-const DEPS = {
-    markmapToc: { dependencies: Dep.true("ENABLE_TOC_MARKMAP") },
-    markmapFence: { dependencies: Dep.true("ENABLE_FENCE_MARKMAP") },
-    fenceEnhanceButton: { dependencies: Dep.true("ENABLE_BUTTON") },
-    fenceEnhanceHotkey: { dependencies: Dep.true("ENABLE_HOTKEY") },
-    countFile: { dependencies: Dep.true("ENABLE_FILE_COUNT") },
-    gesturesDisplay: (btn) => ({ dependencies: Dep.and(Dep.or(Dep.true("ENABLE_VISUALIZER"), Dep.true("ENABLE_HUD")), Dep.contains("TRIGGER_BUTTONS", btn)) }),
-}
-
-const FIELDS = {
-    ENABLE: Switch("ENABLE"),
-    NAME: Text("NAME", { placeholder: "defaultIfEmpty" }),
-    HOTKEY: Hotkey("HOTKEY"),
-    LANGUAGE: Text("LANGUAGE", PROPS.protected),
-    INTERACTIVE_MODE: Switch("INTERACTIVE_MODE"),
-    DEFAULT_FENCE_HEIGHT: Text("DEFAULT_FENCE_HEIGHT"),
-    DEFAULT_FENCE_BACKGROUND_COLOR: Text("DEFAULT_FENCE_BACKGROUND_COLOR"),
-    runtimeSettings: Action("inspectRuntimeSettings", { tooltip: Tip.action("inspectDefaultSettings", "fa fa-codepen") }),
-    restoreSettings: Action("restoreSettings"),
-}
-
-const BOXES = {
-    pluginLite: UntitledBox(FIELDS.ENABLE, FIELDS.NAME),
-    pluginFull: UntitledBox(FIELDS.ENABLE, FIELDS.NAME, FIELDS.HOTKEY),
-    settingHandler: UntitledBox(FIELDS.runtimeSettings, FIELDS.restoreSettings),
-    langMode: TitledBox(TITLES.languageMode, FIELDS.LANGUAGE, FIELDS.INTERACTIVE_MODE),
-    chartStyle: TitledBox(TITLES.diagramStyle, FIELDS.DEFAULT_FENCE_HEIGHT, FIELDS.DEFAULT_FENCE_BACKGROUND_COLOR),
-    TEMPLATE: CodeBox("TEMPLATE"),
-}
-
-/******** Prop Options (for Select/Transfer/Checkbox only) ********/
-const createOptions = (definitions) => {
-    return Object.fromEntries(
-        Object.entries(definitions).map(([name, fields]) => {
-            const ret = Object.fromEntries(
-                Object.entries(fields).map(([key, options]) => {
-                    const opts = Object.fromEntries(options.map(opt => [opt, `${key}.${opt}`]))
-                    return [key, opts]
-                }),
-            )
-            return [name, ret]
-        }),
-    )
-}
-
-const OPTS = createOptions({
-    global: {
-        LOCALE: ["auto", "en", "zh-CN", "zh-TW"],
-        EXIT_CHART_INTERACTION: ["click_exit_button", "ctrl_click_fence"],
-    },
-    window_tab: {
-        CONTEXT_MENU: ["closeTab", "closeOtherTabs", "closeLeftTabs", "closeRightTabs", "copyPath", "showInFinder", "openInNewWindow", "sortTabs"],
-        NEW_TAB_POSITION: ["start", "end", "left", "right"],
-        TAB_SWITCH_ON_CLOSE: ["left", "right", "latest"],
-        LAST_TAB_CLOSE_ACTION: ["blankPage", "reconfirm", "exit"],
-        DRAG_STYLE: ["JetBrains", "VSCode"],
-        TAB_DETACHMENT: ["free", "resistant", "lockVertical"],
-    },
-    search_multi: {
-        TRAVERSE_STRATEGY: ["bfs", "dfs"],
-    },
-    commander: {
-        QUICK_RUN_DISPLAY: ["echo", "always", "error", "silent"],
-        COMMIT_RUN_DISPLAY: ["echo", "always"],
-        "BUILTIN.shell": ["cmd/bash", "powershell", "gitbash", "wsl"],
-    },
-    blur: {
-        BLUR_TYPE: ["blur", "hide"],
-    },
-    resize_image: {
-        IMAGE_ALIGN: ["center", "left", "right"],
-    },
-    markmap: {
-        TITLE_BAR_BUTTONS: ["download", "settings", "fit", "pinRight", "pinTop", "unfold", "expand", "close"],
-    },
-    auto_number: {
-        ALIGN: ["left", "right", "center"],
-        POSITION_TABLE: ["before", "after"],
-    },
-    fence_enhance: {
-        LINE_BREAKS_ON_COPY: ["lf", "crlf", "preserve"],
-        FOLD_OVERFLOW: ["hidden", "scroll"],
-        NUMBERING_BASE: ["0-based", "1-based"],
-    },
-    sidebar_enhance: {
-        OUTLINE_FOLD_STATE: ["alwaysUnfold", "alwaysFold", "remember"],
-    },
-    text_stylize: {
-        TOOLS: ["weight", "italic", "underline", "throughline", "overline", "superScript", "subScript", "emphasis", "blur", "title", "increaseSize", "decreaseSize", "increaseLetterSpacing", "decreaseLetterSpacing", "family", "foregroundColor", "backgroundColor", "borderColor", "erase", "blank", "setBrush", "useBrush"],
-    },
-    resource_manager: {
-        RESOURCE_GRAMMARS: ["markdown", "html"],
-        TRAVERSE_STRATEGY: ["bfs", "dfs"],
-    },
-    mouse_gestures: {
-        POINTER_TYPES: ["mouse", "pen", "touch"],
-        TRIGGER_BUTTONS: ["middle", "right", "x1", "x2"],
-        SUPPRESSION_KEY: ["", "alt", "ctrl", "shift", "meta"],
-        STRATEGY: ["fourWay", "eightWay", "adaptive"],
-        "GESTURES.button": ["", "middle", "right", "x1", "x2"],
-    },
-    slash_commands: {
-        SUGGESTION_TIMING: ["on_input", "debounce"],
-        MATCH_STRATEGY: ["prefix", "substr", "abbr"],
-        ORDER_STRATEGY: ["predefined", "lexicographic", "length_based", "earliest_hit"],
-        "COMMANDS.type": ["snippet", "gen-snp", "command"],
-        "COMMANDS.scope": ["plain", "inline_math"],
-    },
-    preferences: {
-        OBJECT_SETTINGS_FORMAT: ["JSON", "TOML", "YAML"],
-        DEPENDENCIES_FAILURE_BEHAVIOR: ["readonly", "hide"],
-    },
-    static_markers: {
-        STATIC_MARKERS: ["strong", "em", "del", "underline", "superscript", "subscript", "code", "image", "link", "footnote", "highlight", "emoji", "inlineMath", "inlineHTML"],
-    },
-    chart: {
-        CHART_ALIGN: ["left", "center", "right"],
-    },
-    echarts: {
-        LOCALE: ["en", "zh"],
-        THEME: ["light", "dark"],
-        RENDERER: ["svg", "canvas"],
-        EXPORT_TYPE: ["svg", "png", "jpg"],
-    },
-    wavedrom: {
-        CHART_ALIGN: ["left", "center", "right"],
-    },
-    plantUML: {
-        OUTPUT_FORMAT: ["svg", "png", "txt"],
-    },
-    right_outline: {
-        TITLE_BAR_BUTTONS: ["header", "image", "table", "fence", "link", "math"],
-    },
-    image_viewer: {
-        operations: ["close", "download", "scroll", "play", "location", "nextImage", "previousImage", "firstImage", "lastImage", "thumbnailNav", "waterfall", "zoomIn", "zoomOut", "rotateLeft", "rotateRight", "hFlip", "vFlip", "translateLeft", "translateRight", "translateUp", "translateDown", "incHSkew", "decHSkew", "incVSkew", "decVSkew", "originSize", "fitScreen", "autoSize", "restore", "info", "dummy"],
-        TOOL_POSITION: ["bottom", "top"],
-        SHOW_MESSAGE: ["index", "title", "size"],
-        FIRST_IMAGE_STRATEGIES: ["inViewBoxImage", "closestViewBoxImage", "firstImage"],
-        THUMBNAIL_OBJECT_FIT: ["fill", "contain", "cover", "scale-down"],
-    },
-    markdownlint: {
-        TITLE_BAR_BUTTONS: ["settings", "detailAll", "fixAll", "toggleSourceMode", "refresh", "close"],
-        COLUMNS: ["idx", "line", "rule", "desc", "ops"],
-        TOOLS: ["info", "locate", "fix"],
-        RESULT_ORDER_BY: ["index", "lineNumber", "ruleName", "ruleDesc"],
-    },
-})
-
-/******** Schemas ********/
-const schema_global = [
-    UntitledBox(
-        Switch("ENABLE", PROPS.protected),
-        Select("LOCALE", OPTS.global.LOCALE, { tooltip: Tip.action("openLocaleFolder", "fa fa-language") }),
+const schema_global = () => [
+    Group(
+        Switch("ENABLE").Protect(),
+        Select("LOCALE").Options(["auto", "en", "zh-CN", "zh-TW"]).ActionTooltip("openLocaleFolder", "fa fa-language"),
     ),
-    UntitledBox(
+    Group(
         Switch("BATCH_RENDER_CHARTS"),
-        Select("EXIT_CHART_INTERACTION", OPTS.global.EXIT_CHART_INTERACTION, { minItems: 1 }),
+        Select("EXIT_CHART_INTERACTION").Options(["click_exit_button", "ctrl_click_fence"]).MinItems(1),
     ),
-    UntitledBox(
-        Action("inspectRuntimeSettings", { tooltip: [Tip.action("inspectDefaultSettings", "fa fa-codepen"), Tip.action("inspectAllDefaultSettings", "fa fa-codepen")] }),
-        FIELDS.restoreSettings,
+    Group(
+        Action("inspectRuntimeSettings").ActionTooltip("inspectDefaultSettings", "fa fa-codepen").ActionTooltip("inspectAllDefaultSettings", "fa fa-codepen"),
+        Action("restoreSettings"),
         Action("restoreAllSettings"),
-        Action("exportSettings", { tooltip: [Tip.action("openSettingsDefaultTomlExternally", "fa fa-external-link-square"), Tip.action("openSettingsUserTomlExternally", "fa fa-external-link-square")] }),
+        Action("exportSettings").ActionTooltip("openSettingsDefaultTomlExternally", "fa fa-external-link-square").ActionTooltip("openSettingsUserTomlExternally", "fa fa-external-link-square"),
         Action("importSettings"),
     ),
-    UntitledBox(
-        Action("visitRepo", { tooltip: Tip.action("openPluginFolder", "fa fa-folder") }),
-        Action("viewDeepWiki", { tooltip: Tip.action("neverGonnaTellALie", "fa fa-book") }),
+    Group(
+        Action("visitRepo").ActionTooltip("openPluginFolder", "fa fa-folder"),
+        Action("viewDeepWiki").ActionTooltip("neverGonnaTellALie", "fa fa-book"),
         Action("developPlugins"),
         Action("editStyles"),
         Action("viewGithubImageBed"),
     ),
-    UntitledBox(
+    Group(
         Action("updatePlugin"),
         Action("uninstallPlugin"),
-        Action("sendEmail", { tooltip: Tip.action("toggleDevTools", "fa fa-wrench") }),
+        Action("sendEmail").ActionTooltip("toggleDevTools", "fa fa-wrench"),
         Action("donate"),
         Static("pluginVersion"),
     ),
 ]
 
-const schema_window_tab = [
-    BOXES.pluginLite,
-    TitledBox(
-        "appearance",
+const schema_window_tab = () => [
+    Frag.PluginBase(),
+    Group("appearance",
         Switch("SHOW_TAB_CLOSE_BUTTON"),
         Switch("TRIM_FILE_EXT"),
         Switch("SHOW_DIR_ON_DUPLICATE"),
         Switch("HIDE_WINDOW_TITLE_BAR"),
         Text("TAB_MIN_WIDTH"),
         Text("TAB_MAX_WIDTH"),
-        Integer("MAX_TAB_NUM", PROPS.minusOne),
+        Integer("MAX_TAB_NUM").AllowMinusOne(),
     ),
-    TitledBox(
-        "behavior",
+    Group("behavior",
         Switch("REOPEN_TABS_ON_STARTUP"),
-        Select("NEW_TAB_POSITION", OPTS.window_tab.NEW_TAB_POSITION),
-        Select("TAB_SWITCH_ON_CLOSE", OPTS.window_tab.TAB_SWITCH_ON_CLOSE),
-        Select("LAST_TAB_CLOSE_ACTION", OPTS.window_tab.LAST_TAB_CLOSE_ACTION),
+        Select("NEW_TAB_POSITION").Options(["start", "end", "left", "right"]),
+        Select("TAB_SWITCH_ON_CLOSE").Options(["left", "right", "latest"]),
+        Select("LAST_TAB_CLOSE_ACTION").Options(["blankPage", "reconfirm", "exit"]),
     ),
-    TitledBox(
-        "mouseInteraction",
+    Group("mouseInteraction",
         Switch("CTRL_CLICK_TO_NEW_WINDOW"),
         Switch("MIDDLE_CLICK_TO_CLOSE"),
         Switch("CTRL_WHEEL_TO_SWITCH"),
         Switch("WHEEL_TO_SCROLL_TAB_BAR"),
         Switch("SHOW_FULL_PATH_ON_HOVER"),
     ),
-    TitledBox(
-        "drag",
-        Select("DRAG_STYLE", OPTS.window_tab.DRAG_STYLE),
-        Select("TAB_DETACHMENT", OPTS.window_tab.TAB_DETACHMENT, { dependencies: Dep.eq("DRAG_STYLE", "JetBrains") }),
-        Float("DETACHMENT_THRESHOLD", {
-            tooltip: "detachThreshold", min: 0.1, step: 0.1,
-            dependencies: Dep.and(Dep.eq("DRAG_STYLE", "JetBrains"), Dep.eq("TAB_DETACHMENT", "resistant")),
-        }),
-        Float("DRAG_NEW_WINDOW_THRESHOLD", { tooltip: "newWindow", min: -1, step: 0.5, dependencies: Dep.ne("TAB_DETACHMENT", "lockVertical") }),
+    Group("drag",
+        Select("DRAG_STYLE").Options(["JetBrains", "VSCode"]),
+        Select("TAB_DETACHMENT").Options(["free", "resistant", "lockVertical"]).ShowIf(When.eq("DRAG_STYLE", "JetBrains")),
+        Float("DETACHMENT_THRESHOLD").Min(0.1).Step(0.1).Tooltip("detachThreshold").ShowIf(When.and(When.eq("DRAG_STYLE", "JetBrains"), When.eq("TAB_DETACHMENT", "resistant"))),
+        Float("DRAG_NEW_WINDOW_THRESHOLD").Min(-1).Step(0.5).Tooltip("newWindow").ShowIf(When.ne("TAB_DETACHMENT", "lockVertical")),
     ),
-    TransferBox("CONTEXT_MENU", OPTS.window_tab.CONTEXT_MENU),
-    TitledBox(
-        TITLES.hotkey,
+    Transfer("CONTEXT_MENU").Options(["closeTab", "closeOtherTabs", "closeLeftTabs", "closeRightTabs", "copyPath", "showInFinder", "openInNewWindow", "sortTabs"]),
+    Group("hotkey",
         Array_("CLOSE_HOTKEY"),
         Array_("SWITCH_PREVIOUS_TAB_HOTKEY"),
         Array_("SWITCH_NEXT_TAB_HOTKEY"),
@@ -610,181 +172,166 @@ const schema_window_tab = [
         Array_("COPY_PATH_HOTKEY"),
         Array_("TOGGLE_TAB_BAR_HOTKEY"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_search_multi = [
-    BOXES.pluginFull,
-    TitledBox(
-        "search",
+const schema_search_multi = () => [
+    Frag.PluginBase(true),
+    Group("search",
         Switch("CASE_SENSITIVE"),
-        Switch("OPTIMIZE_SEARCH", { tooltip: "breakOrder" }),
+        Switch("OPTIMIZE_SEARCH").Tooltip("breakOrder"),
         Switch("STOP_SEARCHING_ON_HIDING"),
         Switch("BACKSPACE_TO_HIDE"),
     ),
-    TitledBox(
-        "searchResult",
+    Group("searchResult",
         Switch("RELATIVE_PATH"),
         Switch("SHOW_EXT"),
         Switch("SHOW_MTIME"),
         Switch("HIDE_BUTTON_HINT"),
-        Integer("MAX_HIGHLIGHTS", { min: 1, max: 5000 }),
+        Integer("MAX_HIGHLIGHTS").Min(1).Max(5000),
         Palette("HIGHLIGHT_COLORS"),
     ),
-    ArrayBox("ALLOW_EXT"),
-    ArrayBox("IGNORE_FOLDERS"),
-    TitledBox(
-        TITLES.advanced,
+    Array_("ALLOW_EXT"),
+    Array_("IGNORE_FOLDERS"),
+    Group("advanced",
         Switch("FOLLOW_SYMBOLIC_LINKS"),
-        Select("TRAVERSE_STRATEGY", OPTS.search_multi.TRAVERSE_STRATEGY),
-        Integer("TIMEOUT", { ...PROPS.minusOne, unit: UNITS.millisecond }),
-        Integer("MAX_SIZE", { tooltip: "maxBytes", unit: UNITS.byte, min: 1, max: 2000000 }),
-        Integer("MAX_ENTITIES", PROPS.minusOne),
-        Integer("MAX_DEPTH", PROPS.minusOne),
-        Integer("CONCURRENCY_LIMIT", { min: 1 }),
+        Segment("TRAVERSE_STRATEGY").Options(["bfs", "dfs"]),
+        Integer("TIMEOUT").AllowMinusOne().Unit(Units.millisecond),
+        Integer("MAX_SIZE").Unit(Units.byte).Min(1).Max(2000000).Tooltip("maxBytes"),
+        Integer("MAX_ENTITIES").AllowMinusOne(),
+        Integer("MAX_DEPTH").AllowMinusOne(),
+        Integer("CONCURRENCY_LIMIT").Min(1),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_commander = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Switch("BACKSPACE_TO_HIDE"),
+const schema_commander = () => [
+    Frag.PluginBase(true),
+    Switch("BACKSPACE_TO_HIDE"),
+    Group("cmdDisplay",
+        Select("QUICK_RUN_DISPLAY").Options(["echo", "always", "error", "silent"]),
+        Select("COMMIT_RUN_DISPLAY").Options(["echo", "always"]),
     ),
-    TitledBox(
-        "cmdDisplay",
-        Select("QUICK_RUN_DISPLAY", OPTS.commander.QUICK_RUN_DISPLAY),
-        Select("COMMIT_RUN_DISPLAY", OPTS.commander.COMMIT_RUN_DISPLAY),
-    ),
-    TableBox(
-        "BUILTIN",
-        ["name", "shell", "cmd"],
-        [
-            UntitledBox(
+    Table("BUILTIN")
+        .Headers(["name", "shell", "cmd"])
+        .NestedBoxes([
+            Group(
                 Switch("disable"),
-                Select("shell", OPTS.commander["BUILTIN.shell"]),
+                Select("shell").Options(["cmd/bash", "powershell", "gitbash", "wsl"]).OptionScope("BUILTIN.shell"),
                 Text("name"),
             ),
-            TextareaBox("cmd", { rows: 5, placeholder: "envInfo" }),
-        ],
-        {
+            Textarea("cmd").Rows(5).Placeholder("envInfo"),
+        ])
+        .DefaultValues({
             name: "",
             disable: false,
             shell: "cmd/bash",
             cmd: "",
-        },
-    ),
-    BOXES.settingHandler,
+        }),
+    Frag.SettingHandler(),
 ]
 
-const schema_md_padding = [
-    BOXES.pluginFull,
-    ArrayBox("IGNORE_WORDS"),
-    ArrayBox("IGNORE_PATTERNS"),
-    BOXES.settingHandler,
+const schema_md_padding = () => [
+    Frag.PluginBase(true),
+    Array_("IGNORE_WORDS"),
+    Array_("IGNORE_PATTERNS"),
+    Frag.SettingHandler(),
 ]
 
-const schema_read_only = [
-    BOXES.pluginFull,
-    UntitledBox(
+const schema_read_only = () => [
+    Frag.PluginBase(true),
+    Group(
         Switch("READ_ONLY_DEFAULT"),
         Switch("CLICK_HYPERLINK_TO_OPEN_WHEN_READ_ONLY"),
         Switch("DISABLE_EXPAND_WHEN_READ_ONLY"),
-        Switch("AUTO_COLLAPSE_WHEN_READ_ONLY", { dependencies: Dep.false("DISABLE_EXPAND_WHEN_READ_ONLY") }),
+        Switch("AUTO_COLLAPSE_WHEN_READ_ONLY").ShowIf(When.false("DISABLE_EXPAND_WHEN_READ_ONLY")),
         Text("SHOW_TEXT"),
     ),
-    TitledBox(
-        TITLES.advanced,
+    Group("advanced",
         Switch("DISABLE_CONTEXT_MENU_WHEN_READ_ONLY"),
-        Select("REMAIN_AVAILABLE_MENU_KEY", null, { dependencies: Dep.true("DISABLE_CONTEXT_MENU_WHEN_READ_ONLY") }),
+        Select("REMAIN_AVAILABLE_MENU_KEY").ShowIf(When.true("DISABLE_CONTEXT_MENU_WHEN_READ_ONLY")),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_blur = [
-    BOXES.pluginFull,
-    UntitledBox(
+const schema_blur = () => [
+    Frag.PluginBase(true),
+    Group(
         Switch("BLUR_DEFAULT"),
         Switch("RESTORE_ON_HOVER"),
-        Select("BLUR_TYPE", OPTS.blur.BLUR_TYPE),
-        Integer("BLUR_LEVEL", { unit: UNITS.pixel, min: 1, dependencies: Dep.eq("BLUR_TYPE", "blur") }),
+        Segment("BLUR_TYPE").Options(["blur", "hide"]),
+        Integer("BLUR_LEVEL").Unit(Units.pixel).Min(1).ShowIf(When.eq("BLUR_TYPE", "blur")),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_dark = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Switch("DARK_DEFAULT"),
-    ),
-    BOXES.settingHandler,
+const schema_dark = () => [
+    Frag.PluginBase(true),
+    Switch("DARK_DEFAULT"),
+    Frag.SettingHandler(),
 ]
 
-const schema_no_image = [
-    BOXES.pluginFull,
-    UntitledBox(
+const schema_no_image = () => [
+    Frag.PluginBase(true),
+    Group(
         Switch("NO_IMAGE_DEFAULT"),
         Switch("SHOW_ON_HOVER"),
-        Integer("TRANSITION_DURATION", { unit: UNITS.millisecond, min: 0 }),
-        Integer("TRANSITION_DELAY", { unit: UNITS.millisecond, min: 0 }),
+        Integer("TRANSITION_DURATION").Unit(Units.millisecond).Min(0),
+        Integer("TRANSITION_DELAY").Unit(Units.millisecond).Min(0),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_myopic_defocus = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Action("myopicDefocusEffectDemo", { explain: "enableMyopicDefocus" }),
-    ),
-    UntitledBox(
+const schema_myopic_defocus = () => [
+    Frag.PluginBase(true),
+    Action("myopicDefocusEffectDemo").Explain("enableMyopicDefocus"),
+    Group(
         Switch("DEFOCUS_DEFAULT"),
-        Range("EFFECT_STRENGTH", { unit: UNITS.percent, min: 1, max: 35 }),
-        Float("SCREEN_SIZE", { unit: UNITS.inch, min: 1 }),
-        Integer("SCREEN_RESOLUTION_X", { unit: UNITS.pixel, min: 1 }),
-        Integer("SCREEN_RESOLUTION_Y", { unit: UNITS.pixel, min: 1 }),
-        Float("SCREEN_DISTANCE", { unit: UNITS.centimeter, min: 1 }),
+        Range("EFFECT_STRENGTH").Unit(Units.percent).Min(1).Max(35),
+        Float("SCREEN_SIZE").Unit(Units.inch).Min(1),
+        Integer("SCREEN_RESOLUTION_X").Unit(Units.pixel).Min(1),
+        Integer("SCREEN_RESOLUTION_Y").Unit(Units.pixel).Min(1),
+        Float("SCREEN_DISTANCE").Unit(Units.centimeter).Min(1),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_command_palette = [
-    BOXES.pluginFull,
-    UntitledBox(
+const schema_command_palette = () => [
+    Frag.PluginBase(true),
+    Group(
         Switch("BACKSPACE_TO_HIDE"),
-        Integer("DEBOUNCE_INTERVAL", { unit: UNITS.millisecond, min: 10 }),
+        Integer("DEBOUNCE_INTERVAL").Unit(Units.millisecond).Min(10),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_resize_image = [
-    BOXES.pluginLite,
-    TitledBox(
-        "image",
+const schema_resize_image = () => [
+    Frag.PluginBase(),
+    Group("image",
         Switch("RECORD_RESIZE"),
         Switch("ALLOW_EXCEED_LIMIT"),
-        Select("IMAGE_ALIGN", OPTS.resize_image.IMAGE_ALIGN),
+        Segment("IMAGE_ALIGN").Options(["left", "center", "right"]),
     ),
-    TitledBox(
-        "modifierKeys",
-        Hotkey("MODIFIER_KEY.TEMPORARY", { tooltip: "modifyKeyExample" }),
+    Group("modifierKeys",
+        Hotkey("MODIFIER_KEY.TEMPORARY").Tooltip("modifyKeyExample"),
         Hotkey("MODIFIER_KEY.PERSISTENT"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_resize_table = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_resize_table = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("RECORD_RESIZE"),
         Switch("REMOVE_MIN_CELL_WIDTH"),
-        Integer("DRAG_THRESHOLD", { unit: UNITS.pixel, min: 1 }),
+        Integer("DRAG_THRESHOLD").Unit(Units.pixel).Min(1),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_datatables = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_datatables = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("ORDERING"),
         Switch("DEFAULT_ORDER"),
         Switch("SEARCHING"),
@@ -792,103 +339,99 @@ const schema_datatables = [
         Switch("CASE_INSENSITIVE"),
         Switch("SCROLL_COLLAPSE"),
         Switch("PAGING"),
-        Integer("PAGE_LENGTH", { unit: UNITS.item, min: 1 }),
+        Integer("PAGE_LENGTH").Unit(Units.item).Min(1),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_markmap = [
-    BOXES.pluginLite,
-    TitledBox(
-        "mindmapDiagram",
+const schema_markmap = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("ENABLE_TOC_MARKMAP"),
-        Hotkey("TOC_HOTKEY", DEPS.markmapToc),
-        Switch("FIX_SKIPPED_LEVEL_HEADERS", DEPS.markmapToc),
-        Switch("REMOVE_HEADER_STYLES", DEPS.markmapToc),
-        Switch("AUTO_FIT_ON_UPDATE", DEPS.markmapToc),
-        Switch("AUTO_FIT_WHEN_FOLD", DEPS.markmapToc),
-        Switch("RETAIN_FOLD_STATE_ON_UPDATE", DEPS.markmapToc),
-        Switch("USE_CONTEXT_MENU", DEPS.markmapToc),
-        Switch("CLICK_TO_POSITION", DEPS.markmapToc),
-        Switch("AUTO_COLLAPSE_PARAGRAPH_ON_FOLD", { tooltip: "experimental", ...DEPS.markmapToc }),
-        Range("POSITIONING_VIEWPORT_HEIGHT", { tooltip: "positioningViewPort", min: 0.1, max: 0.95, step: 0.01, ...DEPS.markmapToc }),
-        Range("WIDTH_PERCENT_WHEN_INIT", { min: 20, max: 95, step: 1, ...DEPS.markmapToc }),
-        Range("HEIGHT_PERCENT_WHEN_INIT", { min: 20, max: 95, step: 1, ...DEPS.markmapToc }),
-        Range("HEIGHT_PERCENT_WHEN_PIN_TOP", { min: 20, max: 95, step: 1, ...DEPS.markmapToc }),
-        Range("WIDTH_PERCENT_WHEN_PIN_RIGHT", { min: 20, max: 95, step: 1, ...DEPS.markmapToc }),
-    ),
-    TransferBox("TITLE_BAR_BUTTONS", OPTS.markmap.TITLE_BAR_BUTTONS, { minItems: 1, ...DEPS.markmapToc }),
-    TitledBox(
-        "mindmapDiagramDefaultOptions",
-        Switch("DEFAULT_TOC_OPTIONS.zoom", DEPS.markmapToc),
-        Switch("DEFAULT_TOC_OPTIONS.pan", DEPS.markmapToc),
-        Switch("DEFAULT_TOC_OPTIONS.toggleRecursively", DEPS.markmapToc),
-        Range("DEFAULT_TOC_OPTIONS.initialExpandLevel", { min: 1, max: 7, step: 1, ...DEPS.markmapToc }),
-        Range("DEFAULT_TOC_OPTIONS.colorFreezeLevel", { min: 1, max: 7, step: 1, ...DEPS.markmapToc }),
-        Range("DEFAULT_TOC_OPTIONS.fitRatio", { min: 0.5, max: 1, step: 0.01, ...DEPS.markmapToc }),
-        Range("DEFAULT_TOC_OPTIONS.maxInitialScale", { min: 0.5, max: 5, step: 0.25, ...DEPS.markmapToc }),
-        Integer("DEFAULT_TOC_OPTIONS.maxWidth", { tooltip: "zero", unit: UNITS.pixel, min: 0, max: 100, step: 5, ...DEPS.markmapToc }),
-        Integer("DEFAULT_TOC_OPTIONS.nodeMinHeight", { unit: UNITS.pixel, min: 5, max: 50, step: 1, ...DEPS.markmapToc }),
-        Integer("DEFAULT_TOC_OPTIONS.spacingHorizontal", { unit: UNITS.pixel, min: 0, max: 100, step: 5, ...DEPS.markmapToc }),
-        Integer("DEFAULT_TOC_OPTIONS.spacingVertical", { unit: UNITS.pixel, min: 0, max: 100, step: 5, ...DEPS.markmapToc }),
-        Integer("DEFAULT_TOC_OPTIONS.paddingX", { unit: UNITS.pixel, min: 0, max: 100, step: 5, ...DEPS.markmapToc }),
-        Integer("DEFAULT_TOC_OPTIONS.duration", { unit: UNITS.millisecond, min: 0, max: 1000, step: 10, ...DEPS.markmapToc }),
-        Palette("DEFAULT_TOC_OPTIONS.color", DEPS.markmapToc),
-    ),
-    PaletteBox("CANDIDATE_COLOR_SCHEMES", { dimensions: 2, ...DEPS.markmapToc }),
-    TitledBox(
-        "mindmapDiagramExport",
-        Switch("DOWNLOAD_OPTIONS.KEEP_ALPHA_CHANNEL", DEPS.markmapToc),
-        Switch("DOWNLOAD_OPTIONS.REMOVE_USELESS_CLASSES", DEPS.markmapToc),
-        Switch("DOWNLOAD_OPTIONS.REMOVE_FOREIGN_OBJECT", { tooltip: "removeForeignObj", ...DEPS.markmapToc }),
-        Switch("DOWNLOAD_OPTIONS.SHOW_PATH_INQUIRY_DIALOG", DEPS.markmapToc),
-        Switch("DOWNLOAD_OPTIONS.SHOW_IN_FINDER", DEPS.markmapToc),
-        Range("DOWNLOAD_OPTIONS.IMAGE_QUALITY", { tooltip: "pixelImagesOnly", min: 0.01, max: 1, step: 0.01, ...DEPS.markmapToc }),
-        Integer("DOWNLOAD_OPTIONS.PADDING_HORIZONTAL", { unit: UNITS.pixel, min: 1, step: 1, ...DEPS.markmapToc }),
-        Integer("DOWNLOAD_OPTIONS.PADDING_VERTICAL", { unit: UNITS.pixel, min: 1, step: 1, ...DEPS.markmapToc }),
-        Float("DOWNLOAD_OPTIONS.IMAGE_SCALE", { min: 0.1, step: 0.1, ...DEPS.markmapToc }),
-        Text("DOWNLOAD_OPTIONS.FILENAME", DEPS.markmapToc),
-        Text("DOWNLOAD_OPTIONS.FOLDER", { tooltip: "tempDir", ...DEPS.markmapToc }),
-        Text("DOWNLOAD_OPTIONS.BACKGROUND_COLOR", { tooltip: "jpgFormatOnly", ...DEPS.markmapToc }),
-        Text("DOWNLOAD_OPTIONS.TEXT_COLOR", DEPS.markmapToc),
-        Text("DOWNLOAD_OPTIONS.OPEN_CIRCLE_COLOR", DEPS.markmapToc),
-    ),
-    TitledBox(
-        "fence",
         Switch("ENABLE_FENCE_MARKMAP"),
-        Switch("INTERACTIVE_MODE", DEPS.markmapFence),
-        Hotkey("FENCE_HOTKEY", DEPS.markmapFence),
-        Text("FENCE_LANGUAGE", { ...PROPS.protected, ...DEPS.markmapFence }),
-        Text("DEFAULT_FENCE_HEIGHT", DEPS.markmapFence),
-        Text("DEFAULT_FENCE_BACKGROUND_COLOR", DEPS.markmapFence),
     ),
-    TitledBox(
-        "fenceDiagramDefaultOptions",
-        Switch("DEFAULT_FENCE_OPTIONS.zoom", DEPS.markmapFence),
-        Switch("DEFAULT_FENCE_OPTIONS.pan", DEPS.markmapFence),
-        Switch("DEFAULT_FENCE_OPTIONS.toggleRecursively", DEPS.markmapFence),
-        Range("DEFAULT_FENCE_OPTIONS.initialExpandLevel", { min: 1, max: 7, step: 1, ...DEPS.markmapFence }),
-        Range("DEFAULT_FENCE_OPTIONS.colorFreezeLevel", { min: 1, max: 7, step: 1, ...DEPS.markmapFence }),
-        Range("DEFAULT_FENCE_OPTIONS.fitRatio", { min: 0.5, max: 1, step: 0.01, ...DEPS.markmapFence }),
-        Range("DEFAULT_FENCE_OPTIONS.maxInitialScale", { min: 0.5, max: 5, step: 0.25, ...DEPS.markmapFence }),
-        Integer("DEFAULT_FENCE_OPTIONS.maxWidth", { tooltip: "zero", unit: UNITS.pixel, min: 0, max: 1000, step: 10, ...DEPS.markmapFence }),
-        Integer("DEFAULT_FENCE_OPTIONS.nodeMinHeight", { unit: UNITS.pixel, min: 5, max: 50, step: 1, ...DEPS.markmapFence }),
-        Integer("DEFAULT_FENCE_OPTIONS.spacingHorizontal", { unit: UNITS.pixel, min: 0, max: 200, step: 1, ...DEPS.markmapFence }),
-        Integer("DEFAULT_FENCE_OPTIONS.spacingVertical", { unit: UNITS.pixel, min: 0, max: 200, step: 1, ...DEPS.markmapFence }),
-        Integer("DEFAULT_FENCE_OPTIONS.paddingX", { unit: UNITS.pixel, min: 0, max: 100, step: 1, ...DEPS.markmapFence }),
-        Integer("DEFAULT_FENCE_OPTIONS.duration", { unit: UNITS.millisecond, min: 0, max: 1000, step: 10, ...DEPS.markmapFence }),
-        Text("DEFAULT_FENCE_OPTIONS.height", DEPS.markmapFence),
-        Text("DEFAULT_FENCE_OPTIONS.backgroundColor", DEPS.markmapFence),
-        Palette("DEFAULT_FENCE_OPTIONS.color", DEPS.markmapFence),
-    ),
-    CodeBox("FENCE_TEMPLATE", DEPS.markmapFence),
-    BOXES.settingHandler,
+    Group("mindmapDiagram",
+        Hotkey("TOC_HOTKEY"),
+        Switch("FIX_SKIPPED_LEVEL_HEADERS"),
+        Switch("REMOVE_HEADER_STYLES"),
+        Switch("AUTO_FIT_ON_UPDATE"),
+        Switch("AUTO_FIT_WHEN_FOLD"),
+        Switch("RETAIN_FOLD_STATE_ON_UPDATE"),
+        Switch("USE_CONTEXT_MENU"),
+        Switch("CLICK_TO_POSITION"),
+        Switch("AUTO_COLLAPSE_PARAGRAPH_ON_FOLD").Tooltip("experimental"),
+        Range("POSITIONING_VIEWPORT_HEIGHT").Min(0.1).Max(0.95).Step(0.01).Tooltip("positioningViewPort"),
+        Range("WIDTH_PERCENT_WHEN_INIT").Min(20).Max(95).Step(1),
+        Range("HEIGHT_PERCENT_WHEN_INIT").Min(20).Max(95).Step(1),
+        Range("HEIGHT_PERCENT_WHEN_PIN_TOP").Min(20).Max(95).Step(1),
+        Range("WIDTH_PERCENT_WHEN_PIN_RIGHT").Min(20).Max(95).Step(1),
+    ).ShowIf(Deps.markmapToc),
+    Transfer("TITLE_BAR_BUTTONS").Options(["download", "settings", "fit", "pinRight", "pinTop", "unfold", "expand", "close"]).MinItems(1).ShowIf(Deps.markmapToc),
+    Group("mindmapDiagramDefaultOptions",
+        Switch("DEFAULT_TOC_OPTIONS.zoom"),
+        Switch("DEFAULT_TOC_OPTIONS.pan"),
+        Switch("DEFAULT_TOC_OPTIONS.toggleRecursively"),
+        Range("DEFAULT_TOC_OPTIONS.initialExpandLevel").Min(1).Max(7).Step(1),
+        Range("DEFAULT_TOC_OPTIONS.colorFreezeLevel").Min(1).Max(7).Step(1),
+        Range("DEFAULT_TOC_OPTIONS.fitRatio").Min(0.5).Max(1).Step(0.01),
+        Range("DEFAULT_TOC_OPTIONS.maxInitialScale").Min(0.5).Max(5).Step(0.25),
+        Integer("DEFAULT_TOC_OPTIONS.maxWidth").Unit(Units.pixel).Min(0).Max(100).Step(5).Tooltip("zero"),
+        Integer("DEFAULT_TOC_OPTIONS.nodeMinHeight").Unit(Units.pixel).Min(5).Max(50).Step(1),
+        Integer("DEFAULT_TOC_OPTIONS.spacingHorizontal").Unit(Units.pixel).Min(0).Max(100).Step(5),
+        Integer("DEFAULT_TOC_OPTIONS.spacingVertical").Unit(Units.pixel).Min(0).Max(100).Step(5),
+        Integer("DEFAULT_TOC_OPTIONS.paddingX").Unit(Units.pixel).Min(0).Max(100).Step(5),
+        Integer("DEFAULT_TOC_OPTIONS.duration").Unit(Units.millisecond).Min(0).Max(1000).Step(10),
+        Palette("DEFAULT_TOC_OPTIONS.color"),
+    ).ShowIf(Deps.markmapToc),
+    Palette("CANDIDATE_COLOR_SCHEMES").Dimensions(2).ShowIf(Deps.markmapToc),
+    Group("mindmapDiagramExport",
+        Switch("DOWNLOAD_OPTIONS.KEEP_ALPHA_CHANNEL"),
+        Switch("DOWNLOAD_OPTIONS.REMOVE_USELESS_CLASSES"),
+        Switch("DOWNLOAD_OPTIONS.REMOVE_FOREIGN_OBJECT").Tooltip("removeForeignObj"),
+        Switch("DOWNLOAD_OPTIONS.SHOW_PATH_INQUIRY_DIALOG"),
+        Switch("DOWNLOAD_OPTIONS.SHOW_IN_FINDER"),
+        Range("DOWNLOAD_OPTIONS.IMAGE_QUALITY").Min(0.01).Max(1).Step(0.01).Tooltip("pixelImagesOnly"),
+        Integer("DOWNLOAD_OPTIONS.PADDING_HORIZONTAL").Unit(Units.pixel).Min(1).Step(1),
+        Integer("DOWNLOAD_OPTIONS.PADDING_VERTICAL").Unit(Units.pixel).Min(1).Step(1),
+        Float("DOWNLOAD_OPTIONS.IMAGE_SCALE").Min(0.1).Step(0.1),
+        Text("DOWNLOAD_OPTIONS.FILENAME"),
+        Text("DOWNLOAD_OPTIONS.FOLDER").Tooltip("tempDir"),
+        Text("DOWNLOAD_OPTIONS.BACKGROUND_COLOR").Tooltip("jpgFormatOnly"),
+        Text("DOWNLOAD_OPTIONS.TEXT_COLOR"),
+        Text("DOWNLOAD_OPTIONS.OPEN_CIRCLE_COLOR"),
+    ).ShowIf(Deps.markmapToc),
+    Group("fence",
+        Switch("INTERACTIVE_MODE"),
+        Hotkey("FENCE_HOTKEY"),
+        Text("FENCE_LANGUAGE").Protect(),
+        Text("DEFAULT_FENCE_HEIGHT"),
+        Text("DEFAULT_FENCE_BACKGROUND_COLOR"),
+    ).ShowIf(Deps.markmapFence),
+    Group("fenceDiagramDefaultOptions",
+        Switch("DEFAULT_FENCE_OPTIONS.zoom"),
+        Switch("DEFAULT_FENCE_OPTIONS.pan"),
+        Switch("DEFAULT_FENCE_OPTIONS.toggleRecursively"),
+        Range("DEFAULT_FENCE_OPTIONS.initialExpandLevel").Min(1).Max(7).Step(1),
+        Range("DEFAULT_FENCE_OPTIONS.colorFreezeLevel").Min(1).Max(7).Step(1),
+        Range("DEFAULT_FENCE_OPTIONS.fitRatio").Min(0.5).Max(1).Step(0.01),
+        Range("DEFAULT_FENCE_OPTIONS.maxInitialScale").Min(0.5).Max(5).Step(0.25),
+        Integer("DEFAULT_FENCE_OPTIONS.maxWidth").Unit(Units.pixel).Min(0).Max(1000).Step(10).Tooltip("zero"),
+        Integer("DEFAULT_FENCE_OPTIONS.nodeMinHeight").Unit(Units.pixel).Min(5).Max(50).Step(1),
+        Integer("DEFAULT_FENCE_OPTIONS.spacingHorizontal").Unit(Units.pixel).Min(0).Max(200).Step(1),
+        Integer("DEFAULT_FENCE_OPTIONS.spacingVertical").Unit(Units.pixel).Min(0).Max(200).Step(1),
+        Integer("DEFAULT_FENCE_OPTIONS.paddingX").Unit(Units.pixel).Min(0).Max(100).Step(1),
+        Integer("DEFAULT_FENCE_OPTIONS.duration").Unit(Units.millisecond).Min(0).Max(1000).Step(10),
+        Text("DEFAULT_FENCE_OPTIONS.height"),
+        Text("DEFAULT_FENCE_OPTIONS.backgroundColor"),
+        Palette("DEFAULT_FENCE_OPTIONS.color"),
+    ).ShowIf(Deps.markmapFence),
+    Code("FENCE_TEMPLATE").ShowIf(Deps.markmapFence),
+    Frag.SettingHandler(),
 ]
 
-const schema_auto_number = [
-    BOXES.pluginLite,
-    TitledBox(
-        "autoNumbering",
+const schema_auto_number = () => [
+    Frag.PluginBase(),
+    Group("autoNumbering",
         Switch("ENABLE_OUTLINE"),
         Switch("ENABLE_CONTENT"),
         Switch("ENABLE_TOC"),
@@ -896,23 +439,21 @@ const schema_auto_number = [
         Switch("ENABLE_TABLE"),
         Switch("ENABLE_FENCE"),
     ),
-    TitledBox(
-        TITLES.style,
+    Group("style",
         Text("FONT_FAMILY"),
-        Switch("SHOW_IMAGE_NAME", { dependencies: Dep.true("ENABLE_IMAGE") }),
-        Select("POSITION_TABLE", OPTS.auto_number.POSITION_TABLE, { dependencies: Dep.true("ENABLE_TABLE") }),
-        Select("ALIGN", OPTS.auto_number.ALIGN, { dependencies: Dep.or(Dep.true("ENABLE_IMAGE"), Dep.true("ENABLE_TABLE"), Dep.true("ENABLE_FENCE")) }),
+        Switch("SHOW_IMAGE_NAME").ShowIf(When.true("ENABLE_IMAGE")),
+        Segment("POSITION_TABLE").Options(["before", "after"]).ShowIf(When.true("ENABLE_TABLE")),
+        Segment("ALIGN").Options(["left", "center", "right"]).ShowIf(When.or(When.true("ENABLE_IMAGE"), When.true("ENABLE_TABLE"), When.true("ENABLE_FENCE"))),
     ),
-    TableBox(
-        "LAYOUTS",
-        ["name"],
-        [
-            UntitledBox(
-                Hint("layoutSyntax", "layoutSyntax"),
-                Hint("counterNames", "counterNames"),
-                Hint("counterStyles", "counterStyles"),
+    Table("LAYOUTS")
+        .Headers(["name"])
+        .NestedBoxes([
+            Group(
+                Hint().HintHeader("layoutSyntax").HintDetail("layoutSyntax"),
+                Hint().HintHeader("counterNames").HintDetail("counterNames"),
+                Hint().HintHeader("counterStyles").HintDetail("counterStyles"),
             ),
-            UntitledBox(
+            Group(
                 Switch("selected"),
                 Text("name"),
                 Text("layout.content-h1"),
@@ -937,280 +478,236 @@ const schema_auto_number = [
                 Text("layout.image"),
                 Text("layout.fence"),
             ),
-        ],
-        {
+        ])
+        .DefaultValues({
             name: "",
             selected: true,
             layout: {
-                "content-h1": "",
-                "content-h2": "",
-                "content-h3": "",
-                "content-h4": "",
-                "content-h5": "",
-                "content-h6": "",
-                "outline-h1": "",
-                "outline-h2": "",
-                "outline-h3": "",
-                "outline-h4": "",
-                "outline-h5": "",
-                "outline-h6": "",
-                "toc-h1": "",
-                "toc-h2": "",
-                "toc-h3": "",
-                "toc-h4": "",
-                "toc-h5": "",
-                "toc-h6": "",
-                "table": "",
-                "image": "",
-                "fence": "",
+                "content-h1": "", "content-h2": "", "content-h3": "", "content-h4": "", "content-h5": "", "content-h6": "",
+                "outline-h1": "", "outline-h2": "", "outline-h3": "", "outline-h4": "", "outline-h5": "", "outline-h6": "",
+                "toc-h1": "", "toc-h2": "", "toc-h3": "", "toc-h4": "", "toc-h5": "", "toc-h6": "",
+                "table": "", "image": "", "fence": "",
             },
-        },
-    ),
-    UntitledBox(
-        Switch("ENABLE_WHEN_EXPORT"),
-    ),
-    CodeBox("APPLY_EXPORT_HEADER_NUMBERING", { tooltip: "expertsOnly", dependencies: Dep.true("ENABLE_WHEN_EXPORT") }),
-    BOXES.settingHandler,
+        }),
+    Switch("ENABLE_WHEN_EXPORT"),
+    Code("APPLY_EXPORT_HEADER_NUMBERING").Tooltip("expertsOnly").ShowIf(When.true("ENABLE_WHEN_EXPORT")),
+    Frag.SettingHandler(),
 ]
 
-const schema_fence_enhance = [
-    BOXES.pluginLite,
-    TitledBox(
-        "buttonGeneral",
+const schema_fence_enhance = () => [
+    Frag.PluginBase(),
+    Group("buttonGeneral",
         Switch("ENABLE_BUTTON"),
-        Switch("AUTO_HIDE", DEPS.fenceEnhanceButton),
-        Switch("HIDE_BUTTON_HINT", DEPS.fenceEnhanceButton),
-        Range("BUTTON_OPACITY", { min: 0, max: 1, step: 0.05, ...DEPS.fenceEnhanceButton }),
-        Range("BUTTON_OPACITY_HOVER", { min: 0, max: 1, step: 0.05, ...DEPS.fenceEnhanceButton }),
-        Text("BUTTON_SIZE", DEPS.fenceEnhanceButton),
-        Text("BUTTON_COLOR", DEPS.fenceEnhanceButton),
-        Text("BUTTON_PADDING", DEPS.fenceEnhanceButton),
-        Text("BUTTON_TOP", DEPS.fenceEnhanceButton),
-        Text("BUTTON_RIGHT", DEPS.fenceEnhanceButton),
-        Integer("HINT_DURATION", { unit: UNITS.millisecond, min: 500, step: 100, ...DEPS.fenceEnhanceButton }),
+        Switch("AUTO_HIDE").ShowIf(Deps.fenceEnhanceButton),
+        Switch("HIDE_BUTTON_HINT").ShowIf(Deps.fenceEnhanceButton),
+        Range("BUTTON_OPACITY").Min(0).Max(1).Step(0.05).ShowIf(Deps.fenceEnhanceButton),
+        Range("BUTTON_OPACITY_HOVER").Min(0).Max(1).Step(0.05).ShowIf(Deps.fenceEnhanceButton),
+        Text("BUTTON_SIZE").ShowIf(Deps.fenceEnhanceButton),
+        Text("BUTTON_COLOR").ShowIf(Deps.fenceEnhanceButton),
+        Text("BUTTON_PADDING").ShowIf(Deps.fenceEnhanceButton),
+        Text("BUTTON_TOP").ShowIf(Deps.fenceEnhanceButton),
+        Text("BUTTON_RIGHT").ShowIf(Deps.fenceEnhanceButton),
+        Integer("HINT_DURATION").Unit(Units.millisecond).Min(500).Step(100).ShowIf(Deps.fenceEnhanceButton),
     ),
-    TitledBox(
-        "functionButtons",
-        Switch("ENABLE_COPY", DEPS.fenceEnhanceButton),
-        Switch("TRIM_WHITESPACE_ON_COPY", { dependencies: Dep.and(Dep.true("ENABLE_BUTTON"), Dep.true("ENABLE_COPY")) }),
-        Switch("COPY_AS_MARKDOWN", { dependencies: Dep.follow("TRIM_WHITESPACE_ON_COPY") }),
-        Select("LINE_BREAKS_ON_COPY", OPTS.fence_enhance.LINE_BREAKS_ON_COPY, { dependencies: Dep.follow("TRIM_WHITESPACE_ON_COPY") }),
+    Group("functionButtons",
+        Switch("ENABLE_COPY").ShowIf(Deps.fenceEnhanceButton),
+        Switch("TRIM_WHITESPACE_ON_COPY").ShowIf(When.and(When.true("ENABLE_BUTTON"), When.true("ENABLE_COPY"))),
+        Switch("COPY_AS_MARKDOWN").ShowIf(When.follow("TRIM_WHITESPACE_ON_COPY")),
+        Select("LINE_BREAKS_ON_COPY").Options(["lf", "crlf", "preserve"]).ShowIf(When.follow("TRIM_WHITESPACE_ON_COPY")),
         Divider(),
-        Switch("ENABLE_INDENT", DEPS.fenceEnhanceButton),
-        Array_("EXCLUDE_LANGUAGE_ON_INDENT", { dependencies: Dep.and(Dep.true("ENABLE_BUTTON"), Dep.true("ENABLE_INDENT")) }),
+        Switch("ENABLE_INDENT").ShowIf(Deps.fenceEnhanceButton),
+        Array_("EXCLUDE_LANGUAGE_ON_INDENT").ShowIf(When.and(When.true("ENABLE_BUTTON"), When.true("ENABLE_INDENT"))),
         Divider(),
-        Switch("ENABLE_FOLD", DEPS.fenceEnhanceButton),
-        Select("FOLD_OVERFLOW", OPTS.fence_enhance.FOLD_OVERFLOW, { dependencies: Dep.and(Dep.true("ENABLE_BUTTON"), Dep.true("ENABLE_FOLD")) }),
-        Integer("MANUAL_FOLD_LINES", { unit: UNITS.line, min: 1, step: 1, dependencies: Dep.follow("FOLD_OVERFLOW") }),
-        Switch("DEFAULT_FOLD", { dependencies: Dep.follow("FOLD_OVERFLOW") }),
-        Switch("EXPAND_ON_FOCUS", { dependencies: Dep.follow("DEFAULT_FOLD_THRESHOLD") }),
-        Switch("FOLD_ON_BLUR", { dependencies: Dep.follow("DEFAULT_FOLD_THRESHOLD") }),
-        Integer("DEFAULT_FOLD_THRESHOLD", { unit: UNITS.line, min: 0, step: 1, dependencies: Dep.and(Dep.follow("FOLD_OVERFLOW"), Dep.true("DEFAULT_FOLD")) }),
-        Integer("AUTO_FOLD_LINES", { unit: UNITS.line, min: 1, step: 1, dependencies: Dep.follow("DEFAULT_FOLD_THRESHOLD") }),
+        Switch("ENABLE_FOLD").ShowIf(Deps.fenceEnhanceButton),
+        Segment("FOLD_OVERFLOW").Options(["hidden", "scroll"]).ShowIf(When.and(When.true("ENABLE_BUTTON"), When.true("ENABLE_FOLD"))),
+        Integer("MANUAL_FOLD_LINES").Unit(Units.line).Min(1).Step(1).ShowIf(When.follow("FOLD_OVERFLOW")),
+        Switch("DEFAULT_FOLD").ShowIf(When.follow("FOLD_OVERFLOW")),
+        Switch("EXPAND_ON_FOCUS").ShowIf(When.follow("DEFAULT_FOLD_THRESHOLD")),
+        Switch("FOLD_ON_BLUR").ShowIf(When.follow("DEFAULT_FOLD_THRESHOLD")),
+        Integer("DEFAULT_FOLD_THRESHOLD").Unit(Units.line).Min(0).Step(1).ShowIf(When.and(When.follow("FOLD_OVERFLOW"), When.true("DEFAULT_FOLD"))),
+        Integer("AUTO_FOLD_LINES").Unit(Units.line).Min(1).Step(1).ShowIf(When.follow("DEFAULT_FOLD_THRESHOLD")),
     ),
-    TableBox(
-        "CUSTOM_BUTTONS",
-        ["HINT", "ICON"],
-        [
-            UntitledBox(
+    Table("CUSTOM_BUTTONS")
+        .Headers(["HINT", "ICON"])
+        .NestedBoxes([
+            Group(
                 Switch("DISABLE"),
                 Icon("ICON"),
                 Text("HINT"),
             ),
-            CodeBox("ON_INIT"),
-            CodeBox("ON_RENDER"),
-            CodeBox("ON_CLICK"),
-        ],
-        {
+            Code("ON_INIT"),
+            Code("ON_RENDER"),
+            Code("ON_CLICK"),
+        ])
+        .DefaultValues({
             DISABLE: false,
             ICON: "fa fa-bomb",
             HINT: "",
             ON_INIT: "plu => console.log('Initialized')",
             ON_RENDER: "({ btn, fence, cid, enhance }) => console.log('Rendered')",
             ON_CLICK: "({ ev, btn, cont, fence, cm, cid, plu }) => console.log('Clicked')",
-        },
-        DEPS.fenceEnhanceButton,
+        })
+        .ShowIf(Deps.fenceEnhanceButton),
+    Group("buttonHotkeys",
+        Switch("ENABLE_HOTKEY").ActionTooltip("viewCodeMirrorKeymapsManual"),
+        Text("SWAP_PREVIOUS_LINE").ShowIf(Deps.fenceEnhanceHotkey),
+        Text("SWAP_NEXT_LINE").ShowIf(Deps.fenceEnhanceHotkey),
+        Text("COPY_PREVIOUS_LINE").ShowIf(Deps.fenceEnhanceHotkey),
+        Text("COPY_NEXT_LINE").ShowIf(Deps.fenceEnhanceHotkey),
+        Text("INSERT_LINE_PREVIOUS").ShowIf(Deps.fenceEnhanceHotkey),
+        Text("INSERT_LINE_NEXT").ShowIf(Deps.fenceEnhanceHotkey),
     ),
-    TitledBox(
-        "buttonHotkeys",
-        Switch("ENABLE_HOTKEY", { tooltip: Tip.action("viewCodeMirrorKeymapsManual") }),
-        Text("SWAP_PREVIOUS_LINE", DEPS.fenceEnhanceHotkey),
-        Text("SWAP_NEXT_LINE", DEPS.fenceEnhanceHotkey),
-        Text("COPY_PREVIOUS_LINE", DEPS.fenceEnhanceHotkey),
-        Text("COPY_NEXT_LINE", DEPS.fenceEnhanceHotkey),
-        Text("INSERT_LINE_PREVIOUS", DEPS.fenceEnhanceHotkey),
-        Text("INSERT_LINE_NEXT", DEPS.fenceEnhanceHotkey),
-    ),
-    TableBox(
-        "CUSTOM_HOTKEYS",
-        ["HOTKEY", "CALLBACK"],
-        [
-            UntitledBox(
+    Table("CUSTOM_HOTKEYS")
+        .Headers(["HOTKEY", "CALLBACK"])
+        .NestedBoxes([
+            Group(
                 Switch("DISABLE"),
                 Text("HOTKEY"),
             ),
-            CodeBox("CALLBACK"),
-        ],
-        {
+            Code("CALLBACK"),
+        ])
+        .DefaultValues({
             DISABLE: false,
             HOTKEY: "",
             CALLBACK: "({ pre, cid, cm, cursor, lineNum, lastNum, separator }) => console.log('Callback')",
-        },
-        DEPS.fenceEnhanceHotkey,
-    ),
-    TitledBox(
-        "lineHighlighting",
-        Switch("HIGHLIGHT_BY_LANGUAGE", { tooltip: Tip.action("viewVitePressLineHighlighting") }),
-        Select("NUMBERING_BASE", OPTS.fence_enhance.NUMBERING_BASE, { dependencies: Dep.true("HIGHLIGHT_BY_LANGUAGE") }),
-        Text("HIGHLIGHT_PATTERN", { dependencies: Dep.follow("NUMBERING_BASE") }),
-        Text("HIGHLIGHT_LINE_COLOR_BY_LANGUAGE", { dependencies: Dep.follow("NUMBERING_BASE") }),
+        })
+        .ShowIf(Deps.fenceEnhanceHotkey),
+    Group("lineHighlighting",
+        Switch("HIGHLIGHT_BY_LANGUAGE").ActionTooltip("viewVitePressLineHighlighting"),
+        Segment("NUMBERING_BASE").Options(["0-based", "1-based"]).ShowIf(When.true("HIGHLIGHT_BY_LANGUAGE")),
+        Text("HIGHLIGHT_PATTERN").ShowIf(When.follow("NUMBERING_BASE")),
+        Text("HIGHLIGHT_LINE_COLOR_BY_LANGUAGE").ShowIf(When.follow("NUMBERING_BASE")),
         Divider(),
-        Switch("HIGHLIGHT_ON_FOCUS", { tooltip: Tip.action("viewFocusLineHighlightingEffect") }),
-        Text("HIGHLIGHT_LINE_COLOR_ON_FOCUS", { dependencies: Dep.true("HIGHLIGHT_ON_FOCUS") }),
+        Switch("HIGHLIGHT_ON_FOCUS").ActionTooltip("viewFocusLineHighlightingEffect"),
+        Text("HIGHLIGHT_LINE_COLOR_ON_FOCUS").ShowIf(When.true("HIGHLIGHT_ON_FOCUS")),
         Divider(),
         Switch("HIGHLIGHT_ON_HOVER"),
-        Text("HIGHLIGHT_LINE_COLOR_ON_HOVER", { dependencies: Dep.true("HIGHLIGHT_ON_HOVER") }),
+        Text("HIGHLIGHT_LINE_COLOR_ON_HOVER").ShowIf(When.true("HIGHLIGHT_ON_HOVER")),
     ),
-    TitledBox(
-        TITLES.advanced,
-        Switch("SIDE_BY_SIDE_VIEW", { tooltip: [Tip.info("stylisticConfusion"), Tip.action("viewSideBySideEffect")] }),
-        Switch("VISIBLE_TABS", { tooltip: Tip.action("viewVisibleTabsEffect") }),
-        Switch("ENABLE_LANGUAGE_FOLD", { tooltip: Tip.action("viewCodeFoldingEffect") }),
-        Switch("INDENTED_WRAPPED_LINE", { tooltip: Tip.action("viewIndentedWrappedLineEffect") }),
-        Switch("PRELOAD_ALL_FENCES", { tooltip: "dangerous" }),
+    Group("advanced",
+        Switch("SIDE_BY_SIDE_VIEW").Tooltip("stylisticConfusion").ActionTooltip("viewSideBySideEffect"),
+        Switch("VISIBLE_TABS").ActionTooltip("viewVisibleTabsEffect"),
+        Switch("ENABLE_LANGUAGE_FOLD").ActionTooltip("viewCodeFoldingEffect"),
+        Switch("INDENTED_WRAPPED_LINE").ActionTooltip("viewIndentedWrappedLineEffect"),
+        Switch("PRELOAD_ALL_FENCES").Tooltip("dangerous"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_collapse_paragraph = [
-    UntitledBox(
-        Switch("ENABLE", { tooltip: "ConflictWithOptionExpandSimpleBlock" }),
-        FIELDS.NAME,
+const schema_collapse_paragraph = () => [
+    Group(
+        Switch("ENABLE").Tooltip("ConflictWithOptionExpandSimpleBlock"),
+        Text("NAME").Placeholder("defaultIfEmpty"),
     ),
-    TitledBox(
-        "mode",
+    Group("mode",
         Switch("RECORD_COLLAPSE"),
         Switch("STRICT_MODE"),
         Switch("STRICT_MODE_IN_CONTEXT_MENU"),
     ),
-    TitledBox(
-        "modifierKey",
-        Hotkey("MODIFIER_KEY.COLLAPSE_SINGLE", { tooltip: "modifierKeyExample" }),
+    Group("modifierKey",
+        Hotkey("MODIFIER_KEY.COLLAPSE_SINGLE").Tooltip("modifierKeyExample"),
         Hotkey("MODIFIER_KEY.COLLAPSE_SIBLINGS"),
         Hotkey("MODIFIER_KEY.COLLAPSE_ALL_SIBLINGS"),
         Hotkey("MODIFIER_KEY.COLLAPSE_RECURSIVE"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_collapse_list = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_collapse_list = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("RECORD_COLLAPSE"),
         Text("TRIANGLE_COLOR"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_collapse_table = [
-    BOXES.pluginLite,
-    UntitledBox(
-        Switch("RECORD_COLLAPSE"),
-    ),
-    BOXES.settingHandler,
+const schema_collapse_table = () => [
+    Frag.PluginBase(),
+    Switch("RECORD_COLLAPSE"),
+    Frag.SettingHandler(),
 ]
 
-const schema_truncate_text = [
-    BOXES.pluginLite,
-    TitledBox(
-        TITLES.hotkey,
+const schema_truncate_text = () => [
+    Frag.PluginBase(),
+    Group("hotkey",
         Hotkey("HIDE_FRONT_HOTKEY"),
         Hotkey("HIDE_BASE_VIEW_HOTKEY"),
         Hotkey("SHOW_ALL_HOTKEY"),
-        Integer("RETAIN_LENGTH", { min: 1, dependencies: Dep.or(Dep.bool("HIDE_FRONT_HOTKEY", true), Dep.bool("HIDE_BASE_VIEW_HOTKEY", true)) }),
+        Integer("RETAIN_LENGTH").Min(1).ShowIf(When.or(When.bool("HIDE_FRONT_HOTKEY", true), When.bool("HIDE_BASE_VIEW_HOTKEY", true))),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_export_enhance = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_export_enhance = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("EMBED_NETWORK_IMAGES"),
-        Integer("DOWNLOAD_THREADS", { min: 1, dependencies: Dep.true("EMBED_NETWORK_IMAGES") }),
+        Integer("DOWNLOAD_THREADS").Min(1).ShowIf(When.true("EMBED_NETWORK_IMAGES")),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_text_stylize = [
-    BOXES.pluginFull,
-    TransferBox("TOOLS", OPTS.text_stylize.TOOLS, { minItems: 1 }),
-    TableBox(
-        "ACTION_HOTKEYS",
-        ["hotkey", "action"],
-        [
-            UntitledBox(
-                Select("action", OPTS.text_stylize.TOOLS),
+const schema_text_stylize = () => [
+    Frag.PluginBase(true),
+    Transfer("TOOLS").Options(Opts.textStylizeTools).MinItems(1),
+    Table("ACTION_HOTKEYS")
+        .Headers(["hotkey", "action"])
+        .NestedBoxes([
+            Group(
+                Select("action").Options(Opts.textStylizeTools).OptionScope("TOOLS"),
                 Hotkey("hotkey"),
             ),
-        ],
-        {
-            hotkey: "",
-            action: "weight",
-        },
-    ),
-    TitledBox(
-        "buttonDefaultOptions",
+        ])
+        .DefaultValues({ hotkey: "", action: "weight" }),
+    Group("buttonDefaultOptions",
         Color("DEFAULT_COLORS.FOREGROUND"),
         Color("DEFAULT_COLORS.BACKGROUND"),
         Color("DEFAULT_COLORS.BORDER"),
-        Text("DEFAULT_FORMAT_BRUSH", { tooltip: "brushExample" }),
+        Text("DEFAULT_FORMAT_BRUSH").Tooltip("brushExample"),
     ),
-    PaletteBox("COLOR_TABLE", { dimensions: 2, allowJagged: false }),
-    BOXES.settingHandler,
+    Palette("COLOR_TABLE").Dimensions(2).AllowJagged(false),
+    Frag.SettingHandler(),
 ]
 
-const schema_cipher = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_cipher = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("SHOW_HINT_MODAL"),
-        Password("SECRET_KEY", PROPS.protected),
+        Password("SECRET_KEY").Protect(),
     ),
-    TitledBox(
-        TITLES.hotkey,
+    Group("hotkey",
         Hotkey("ENCRYPT_HOTKEY"),
         Hotkey("DECRYPT_HOTKEY"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_resource_manager = [
-    BOXES.pluginFull,
-    TitledBox(
-        "windowPosition",
-        Range("MODAL_LEFT_PERCENT", PROPS.percent),
-        Range("MODAL_WIDTH_PERCENT", PROPS.percent),
-        Range("MODAL_HEIGHT_PERCENT", PROPS.percent),
+const schema_resource_manager = () => [
+    Frag.PluginBase(true),
+    Group("windowPosition",
+        Range("MODAL_LEFT_PERCENT").Percent(),
+        Range("MODAL_WIDTH_PERCENT").Percent(),
+        Range("MODAL_HEIGHT_PERCENT").Percent(),
     ),
-    ArrayBox("RESOURCE_EXT"),
-    ArrayBox("MARKDOWN_EXT"),
-    ArrayBox("IGNORE_FOLDERS"),
-    TitledBox(
-        TITLES.advanced,
-        Select("RESOURCE_GRAMMARS", OPTS.resource_manager.RESOURCE_GRAMMARS, { minItems: 1 }),
-        Select("TRAVERSE_STRATEGY", OPTS.resource_manager.TRAVERSE_STRATEGY),
+    Array_("RESOURCE_EXT"),
+    Array_("MARKDOWN_EXT"),
+    Array_("IGNORE_FOLDERS"),
+    Group("advanced",
+        Select("RESOURCE_GRAMMARS").Options(["markdown", "html"]).MinItems(1),
+        Segment("TRAVERSE_STRATEGY").Options(["bfs", "dfs"]),
         Switch("FOLLOW_SYMBOLIC_LINKS"),
-        Integer("TIMEOUT", { unit: UNITS.millisecond, min: 1 }),
-        Integer("MAX_ENTITIES", PROPS.minusOne),
-        Integer("MAX_DEPTH", PROPS.minusOne),
-        Integer("CONCURRENCY_LIMIT", { min: 1 }),
+        Integer("TIMEOUT").Unit(Units.millisecond).Min(1),
+        Integer("MAX_ENTITIES").AllowMinusOne(),
+        Integer("MAX_DEPTH").AllowMinusOne(),
+        Integer("CONCURRENCY_LIMIT").Min(1),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_easy_modify = [
-    BOXES.pluginLite,
-    TitledBox(
-        TITLES.hotkey,
+const schema_easy_modify = () => [
+    Frag.PluginBase(),
+    Group("hotkey",
         Hotkey("HOTKEY_COPY_FULL_PATH"),
         Hotkey("HOTKEY_INCREASE_HEADERS_LEVEL"),
         Hotkey("HOTKEY_DECREASE_HEADERS_LEVEL"),
@@ -1225,99 +722,92 @@ const schema_easy_modify = [
         Hotkey("HOTKEY_CONVERT_IMAGE_TO_BASE64"),
         Hotkey("HOTKEY_CONVERT_ALL_IMAGES_TO_BASE64"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_custom = [
-    UntitledBox(
-        Switch("ENABLE", PROPS.protected),
-        FIELDS.NAME,
+const schema_custom = () => [
+    Group(
+        Switch("ENABLE").Protect(),
+        Text("NAME").Placeholder("defaultIfEmpty"),
     ),
-    UntitledBox(
-        Switch("HIDE_DISABLE_PLUGINS"),
-    ),
-    BOXES.settingHandler,
+    Switch("HIDE_DISABLE_PLUGINS"),
+    Frag.SettingHandler(),
 ]
 
-const schema_mouse_gestures = [
-    BOXES.pluginLite,
-    UntitledBox(
-        Select("POINTER_TYPES", OPTS.mouse_gestures.POINTER_TYPES, { minItems: 1 }),
-        Select("TRIGGER_BUTTONS", OPTS.mouse_gestures.TRIGGER_BUTTONS, { minItems: 1 }),
-        Select("SUPPRESSION_KEY", OPTS.mouse_gestures.SUPPRESSION_KEY),
-        Integer("START_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "START_TIMEOUT" }),
-        Integer("IDLE_TIMEOUT", { unit: UNITS.millisecond, min: 0, tooltip: "IDLE_TIMEOUT" }),
-        Integer("COOLDOWN", { unit: UNITS.millisecond, min: 0, tooltip: "COOLDOWN" }),
+const schema_mouse_gestures = () => [
+    Frag.PluginBase(),
+    Group(
+        Select("POINTER_TYPES").Options(["mouse", "pen", "touch"]).MinItems(1),
+        Select("TRIGGER_BUTTONS").Options(["middle", "right", "x1", "x2"]).MinItems(1),
+        Select("SUPPRESSION_KEY").Options(["", "alt", "ctrl", "shift", "meta"]),
+        Integer("START_TIMEOUT").Unit(Units.millisecond).Min(0).Tooltip("START_TIMEOUT"),
+        Integer("IDLE_TIMEOUT").Unit(Units.millisecond).Min(0).Tooltip("IDLE_TIMEOUT"),
+        Integer("COOLDOWN").Unit(Units.millisecond).Min(0).Tooltip("COOLDOWN"),
     ),
-    UntitledBox(
+    Group(
         Switch("ENABLE_VISUALIZER"),
         Switch("ENABLE_HUD"),
         Switch("ENABLE_SENSORY"),
-        Integer("TRAJECTORY_LINE_WIDTH", { unit: UNITS.pixel, min: 1, dependencies: Dep.true("ENABLE_VISUALIZER") }),
-        Color("DEFAULT_COLOR.middle", DEPS.gesturesDisplay("middle")),
-        Color("DEFAULT_COLOR.right", DEPS.gesturesDisplay("right")),
-        Color("DEFAULT_COLOR.x1", DEPS.gesturesDisplay("x1")),
-        Color("DEFAULT_COLOR.x2", DEPS.gesturesDisplay("x2")),
+        Integer("TRAJECTORY_LINE_WIDTH").Unit(Units.pixel).Min(1).ShowIf(When.true("ENABLE_VISUALIZER")),
+        Color("DEFAULT_COLOR.middle").ShowIf(Deps.gesturesDisplay("middle")),
+        Color("DEFAULT_COLOR.right").ShowIf(Deps.gesturesDisplay("right")),
+        Color("DEFAULT_COLOR.x1").ShowIf(Deps.gesturesDisplay("x1")),
+        Color("DEFAULT_COLOR.x2").ShowIf(Deps.gesturesDisplay("x2")),
     ),
-    TableBox(
-        "GESTURES",
-        ["path", "button", "name"],
-        [
-            UntitledBox(
+    Table("GESTURES")
+        .Headers(["path", "button", "name"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
                 Text("name"),
-                Select("button", OPTS.mouse_gestures["GESTURES.button"]),
+                Select("button").Options(["", "middle", "right", "x1", "x2"]).OptionScope("GESTURES.button"),
                 Text("path"),
-                Integer("cooldown", { unit: UNITS.millisecond, min: 0 }),
+                Integer("cooldown").Unit(Units.millisecond).Min(0),
             ),
-            CodeBox("execute"),
-        ],
-        {
+            Code("execute"),
+        ])
+        .DefaultValues({
             enable: true,
             name: "",
             button: "",
             path: "",
             cooldown: 0,
             execute: "() => console.log('triggered')",
-        },
+        }),
+    Group("advanced",
+        Select("STRATEGY").Options(["fourWay", "eightWay", "adaptive"]).Tooltip("STRATEGY"),
+        Integer("MACRO_RADIUS").Unit(Units.pixel).Min(1).Tooltip("MACRO_RADIUS"),
+        Integer("TAIL_RADIUS").Unit(Units.pixel).Min(1).Tooltip("TAIL_RADIUS"),
+        Integer("HYSTERESIS").Unit(Units.degree).Min(0).Max(45).Tooltip("HYSTERESIS"),
     ),
-    TitledBox(
-        TITLES.advanced,
-        Select("STRATEGY", OPTS.mouse_gestures.STRATEGY, { tooltip: "STRATEGY" }),
-        Integer("MACRO_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "MACRO_RADIUS" }),
-        Integer("TAIL_RADIUS", { unit: UNITS.pixel, min: 1, tooltip: "TAIL_RADIUS" }),
-        Integer("HYSTERESIS", { unit: UNITS.degree, min: 0, max: 45, tooltip: "HYSTERESIS" }),
-    ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_slash_commands = [
-    BOXES.pluginLite,
-    TitledBox(
-        "trigger",
+const schema_slash_commands = () => [
+    Frag.PluginBase(),
+    Group("trigger",
         Text("TRIGGER_REGEXP"),
-        Text("FUNC_PARAM_SEPARATOR", PROPS.protected),
-        Select("SUGGESTION_TIMING", OPTS.slash_commands.SUGGESTION_TIMING),
-        Select("MATCH_STRATEGY", OPTS.slash_commands.MATCH_STRATEGY),
-        Select("ORDER_STRATEGY", OPTS.slash_commands.ORDER_STRATEGY),
+        Text("FUNC_PARAM_SEPARATOR").Protect(),
+        Select("SUGGESTION_TIMING").Options(["on_input", "debounce"]),
+        Select("MATCH_STRATEGY").Options(["prefix", "substr", "abbr"]),
+        Select("ORDER_STRATEGY").Options(["predefined", "lexicographic", "length_based", "earliest_hit"]),
     ),
-    TableBox(
-        "COMMANDS",
-        ["keyword", "type"],
-        [
-            UntitledBox(
+    Table("COMMANDS")
+        .Headers(["keyword", "type"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
-                Select("type", OPTS.slash_commands["COMMANDS.type"]),
-                Select("scope", OPTS.slash_commands["COMMANDS.scope"]),
-                Text("keyword", { placeholder: "LettersAndNumbersOnly" }),
-                Text("icon", { placeholder: "emojiOnly" }),
+                Select("type").Options(["snippet", "gen-snp", "command"]).OptionScope("COMMANDS.type"),
+                Select("scope").Options(["plain", "inline_math"]).OptionScope("COMMANDS.scope"),
+                Text("keyword").Placeholder("LettersAndNumbersOnly"),
+                Text("icon").Placeholder("emojiOnly"),
                 Text("hint"),
                 Integer("cursorOffset.0"),
                 Integer("cursorOffset.1"),
             ),
-            CodeBox("callback", { placeholder: "callbackType" }),
-        ],
-        {
+            Code("callback").Placeholder("callbackType"),
+        ])
+        .DefaultValues({
             enable: true,
             type: "snippet",
             scope: "plain",
@@ -1326,127 +816,128 @@ const schema_slash_commands = [
             hint: "",
             cursorOffset: [0, 0],
             callback: "",
-        },
-    ),
-    BOXES.settingHandler,
+        }),
+    Frag.SettingHandler(),
 ]
 
-const schema_cjk_symbol_pairing = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_cjk_symbol_pairing = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("AUTO_SKIP_PAIR"),
         Switch("AUTO_DELETE_PAIR"),
         Switch("AUTO_SURROUND_PAIR"),
         Switch("AUTO_CONVERT_FULL_TO_HALF"),
     ),
-    TableBox(
-        "AUTO_PAIR_SYMBOLS",
-        ["input", "output"],
-        [
-            UntitledBox(
+    Table("AUTO_PAIR_SYMBOLS")
+        .Headers(["input", "output"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
                 Text("input"),
                 Text("output"),
             ),
-        ],
-        { enable: true, input: "", output: "" },
-    ),
-    TableBox(
-        "AUTO_CONVERT_SYMBOLS",
-        ["input", "output"],
-        [
-            UntitledBox(
+        ])
+        .DefaultValues({ enable: true, input: "", output: "" }),
+    Table("AUTO_CONVERT_SYMBOLS")
+        .Headers(["input", "output"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
                 Text("input"),
                 Text("output"),
             ),
-        ],
-        { enable: true, input: "", output: "" },
-        { dependencies: Dep.true("AUTO_CONVERT_FULL_TO_HALF") },
-    ),
-    BOXES.settingHandler,
+        ])
+        .DefaultValues({ enable: true, input: "", output: "" })
+        .ShowIf(When.true("AUTO_CONVERT_FULL_TO_HALF")),
+    Frag.SettingHandler(),
 ]
 
-const schema_right_click_menu = [
-    UntitledBox(
-        Switch("ENABLE", PROPS.protected),
-        FIELDS.NAME,
+const schema_right_outline = () => [
+    Frag.PluginBase(true),
+    Group(
+        Switch("DEFAULT_SHOW_OUTLINE"),
+        Switch("REMOVE_HEADER_STYLES"),
+        Switch("SORTABLE"),
+        Switch("RIGHT_CLICK_OUTLINE_BUTTON_TO_TOGGLE"),
+        Range("DEFAULT_WIDTH_PERCENT").Percent(),
     ),
-    TitledBox(
-        TITLES.style,
+    Transfer("TITLE_BAR_BUTTONS").Options(["header", "image", "table", "fence", "link", "math"]),
+    Group("displayHeader",
+        Switch("INCLUDE_HEADINGS.image").ShowIf(When.contains("TITLE_BAR_BUTTONS", "image")),
+        Switch("INCLUDE_HEADINGS.table").ShowIf(When.contains("TITLE_BAR_BUTTONS", "table")),
+        Switch("INCLUDE_HEADINGS.fence").ShowIf(When.contains("TITLE_BAR_BUTTONS", "fence")),
+        Switch("INCLUDE_HEADINGS.link").ShowIf(When.contains("TITLE_BAR_BUTTONS", "link")),
+        Switch("INCLUDE_HEADINGS.math").ShowIf(When.contains("TITLE_BAR_BUTTONS", "math")),
+    ),
+    Frag.SettingHandler(),
+]
+
+const schema_right_click_menu = () => [
+    Group(
+        Switch("ENABLE").Protect(),
+        Text("NAME").Placeholder("defaultIfEmpty"),
+    ),
+    Group("style",
         Switch("SHOW_PLUGIN_HOTKEY"),
         Switch("SHOW_ACTION_OPTIONS_ICON"),
         Switch("DO_NOT_HIDE"),
         Switch("HIDE_OTHER_OPTIONS"),
         Text("MENU_MIN_WIDTH"),
     ),
-    TableBox(
-        "MENUS",
-        ["NAME", "LIST"],
-        [
-            UntitledBox(
-                Text("NAME"),
-            ),
-            TransferBox("LIST"),
-        ],
-        {
+    Table("MENUS")
+        .Headers(["NAME", "LIST"])
+        .NestedBoxes([
+            Text("NAME"),
+            Transfer("LIST"),
+        ])
+        .DefaultValues({
             NAME: "",
             LIST: [],
-        },
-    ),
-    TitledBox(
-        TITLES.advanced,
+        }),
+    Group("advanced",
         Switch("FIND_LOST_PLUGINS"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_pie_menu = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Hotkey("MODIFIER_KEY", { tooltip: "example" }),
-    ),
-    TableBox(
-        "BUTTONS",
-        ["CALLBACK", "ICON"],
-        [
-            UntitledBox(
+const schema_pie_menu = () => [
+    Frag.PluginBase(true),
+    Hotkey("MODIFIER_KEY").Tooltip("example"),
+    Table("BUTTONS")
+        .Headers(["CALLBACK", "ICON"])
+        .NestedBoxes([
+            Group(
                 Icon("ICON"),
                 Text("CALLBACK"),
             ),
-        ],
-        {
-            ICON: "fa fa-bomb",
-            CALLBACK: "",
-        },
-    ),
-    BOXES.settingHandler,
+        ])
+        .DefaultValues({ ICON: "fa fa-bomb", CALLBACK: "" }),
+    Frag.SettingHandler(),
 ]
 
-const schema_preferences = [
-    UntitledBox(
-        Switch("ENABLE", PROPS.protected),
-        FIELDS.NAME,
-        FIELDS.HOTKEY,
+const schema_preferences = () => [
+    Group(
+        Switch("ENABLE").Protect(),
+        Text("NAME").Placeholder("defaultIfEmpty"),
+        Hotkey("HOTKEY"),
     ),
-    UntitledBox(
+    Group(
         Switch("COLLAPSIBLE_BOX"),
-        Select("DEPENDENCIES_FAILURE_BEHAVIOR", OPTS.preferences.DEPENDENCIES_FAILURE_BEHAVIOR),
-        Select("OBJECT_SETTINGS_FORMAT", OPTS.preferences.OBJECT_SETTINGS_FORMAT),
+        Segment("DEPENDENCIES_FAILURE_BEHAVIOR").Options(["readonly", "hide"]),
+        Segment("OBJECT_SETTINGS_FORMAT").Options(["JSON", "TOML", "YAML"]),
         Select("DEFAULT_MENU"),
         Select("HIDE_MENUS"),
     ),
-    CodeBox("FORM_RENDERING_HOOK", { tooltip: "expertsOnly" }),
-    BOXES.settingHandler,
+    Code("FORM_RENDERING_HOOK").Tooltip("expertsOnly"),
+    Frag.SettingHandler(),
 ]
 
-const schema_hotkeys = [
-    BOXES.pluginFull,
-    TableBox(
-        "CUSTOM_HOTKEYS",
-        ["hotkey", "desc"],
-        [
-            UntitledBox(
+const schema_hotkeys = () => [
+    Frag.PluginBase(true),
+    Table("CUSTOM_HOTKEYS")
+        .Headers(["hotkey", "desc"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
                 Hotkey("hotkey"),
                 Text("desc"),
@@ -1454,9 +945,9 @@ const schema_hotkeys = [
                 Text("function"),
                 Text("closestSelector"),
             ),
-            CodeBox("evil"),
-        ],
-        {
+            Code("evil"),
+        ])
+        .DefaultValues({
             enable: true,
             hotkey: "",
             desc: "",
@@ -1464,227 +955,228 @@ const schema_hotkeys = [
             function: "",
             closestSelector: "",
             evil: "(anchorNode) => console.log(`Invoke with anchor: ${anchorNode}`)",
-        },
-    ),
-    BOXES.settingHandler,
+        }),
+    Frag.SettingHandler(),
 ]
 
-const schema_asset_root_redirect = [
-    BOXES.pluginLite,
-    UntitledBox(
-        Text("ROOT_PATH"),
-    ),
-    ArrayBox("IGNORE_GLOB_FILES", { tooltip: Tip.action("viewGlobPattern") }),
-    BOXES.settingHandler,
+const schema_asset_root_redirect = () => [
+    Frag.PluginBase(),
+    Text("ROOT_PATH"),
+    Array_("IGNORE_GLOB_FILES").ActionTooltip("viewGlobPattern"),
+    Frag.SettingHandler(),
 ]
 
-const schema_bookmark = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Hotkey("MODIFIER_KEY", { tooltip: "modifierKeyExample" }),
+const schema_bookmark = () => [
+    Frag.PluginBase(true),
+    Group(
+        Hotkey("MODIFIER_KEY").Tooltip("modifierKeyExample"),
         Switch("AUTO_POPUP_WINDOW"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_editor_width_slider = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Integer("WIDTH_RATIO", { tooltip: "minusOneMeansDisable", unit: UNITS.percent, min: -1, max: 100, step: 1 }),
-    ),
-    BOXES.settingHandler,
+const schema_templater = () => [
+    Frag.PluginBase(true),
+    Switch("AUTO_OPEN"),
+    Table("TEMPLATE_VARIABLES")
+        .Headers(["name", "callback"])
+        .NestedBoxes([
+            Group(
+                Switch("enable"),
+                Text("name"),
+            ),
+            Code("callback"),
+        ])
+        .DefaultValues({
+            enable: true,
+            name: "",
+            callback: "(...args) => console.log(`Invoke with params: ${args}`)",
+        }),
+    Table("TEMPLATE")
+        .Headers(["name", "text"])
+        .NestedBoxes([
+            Text("name"),
+            Textarea("text").Rows(10),
+        ])
+        .DefaultValues({ name: "", text: "" }),
+    Array_("TEMPLATE_FOLDERS"),
+    Frag.SettingHandler(),
 ]
 
-const schema_article_uploader = [
-    UntitledBox(
-        Switch("ENABLE", { tooltip: Tip.action("viewArticleUploaderReadme", "fa fa-flask") }),
-        FIELDS.NAME,
+const schema_editor_width_slider = () => [
+    Frag.PluginBase(true),
+    Integer("WIDTH_RATIO").Unit(Units.percent).Min(-1).Max(100).Step(1).Tooltip("minusOneMeansDisable"),
+    Frag.SettingHandler(),
+]
+
+const schema_article_uploader = () => [
+    Group(
+        Switch("ENABLE").ActionTooltip("viewArticleUploaderReadme", "fa fa-flask"),
+        Text("NAME").Placeholder("defaultIfEmpty"),
     ),
-    UntitledBox(
-        Switch("HIDE"),
+    Switch("HIDE"),
+    Group("hotkey",
+        Hotkey("UPLOAD_ALL_HOTKEY").ShowIf(When.or(When.true("upload.cnblog.enabled"), When.true("upload.wordpress.enabled"), When.true("upload.csdn.enabled"))),
+        Hotkey("UPLOAD_CNBLOG_HOTKEY").ShowIf(When.true("upload.cnblog.enabled")),
+        Hotkey("UPLOAD_WORDPRESS_HOTKEY").ShowIf(When.true("upload.wordpress.enabled")),
+        Hotkey("UPLOAD_CSDN_HOTKEY").ShowIf(When.true("upload.csdn.enabled")),
     ),
-    TitledBox(
-        TITLES.hotkey,
-        Hotkey("UPLOAD_ALL_HOTKEY", { dependencies: Dep.or(Dep.true("upload.cnblog.enabled"), Dep.true("upload.wordpress.enabled"), Dep.true("upload.csdn.enabled")) }),
-        Hotkey("UPLOAD_CNBLOG_HOTKEY", { dependencies: Dep.true("upload.cnblog.enabled") }),
-        Hotkey("UPLOAD_WORDPRESS_HOTKEY", { dependencies: Dep.true("upload.wordpress.enabled") }),
-        Hotkey("UPLOAD_CSDN_HOTKEY", { dependencies: Dep.true("upload.csdn.enabled") }),
-    ),
-    TitledBox(
-        "upload",
+    Group("upload",
         Switch("upload.reconfirm"),
         Switch("upload.selenium.headless"),
     ),
-    TitledBox(
-        "wordPress",
+    Group("wordPress",
         Switch("upload.wordpress.enabled"),
-        Text("upload.wordpress.hostname", { dependencies: Dep.true("upload.wordpress.enabled") }),
-        Text("upload.wordpress.loginUrl", { dependencies: Dep.true("upload.wordpress.enabled") }),
-        Text("upload.wordpress.username", { dependencies: Dep.true("upload.wordpress.enabled") }),
-        Password("upload.wordpress.password", { dependencies: Dep.true("upload.wordpress.enabled") }),
+        Text("upload.wordpress.hostname").ShowIf(When.true("upload.wordpress.enabled")),
+        Text("upload.wordpress.loginUrl").ShowIf(When.true("upload.wordpress.enabled")),
+        Text("upload.wordpress.username").ShowIf(When.true("upload.wordpress.enabled")),
+        Password("upload.wordpress.password").ShowIf(When.true("upload.wordpress.enabled")),
     ),
-    TitledBox(
-        "cnblog",
+    Group("cnblog",
         Switch("upload.cnblog.enabled"),
-        Text("upload.cnblog.username", { dependencies: Dep.true("upload.cnblog.enabled") }),
-        Password("upload.cnblog.password", { dependencies: Dep.true("upload.cnblog.enabled") }),
+        Text("upload.cnblog.username").ShowIf(When.true("upload.cnblog.enabled")),
+        Password("upload.cnblog.password").ShowIf(When.true("upload.cnblog.enabled")),
     ),
-    TitledBox(
-        "csdn",
+    Group("csdn",
         Switch("upload.csdn.enabled"),
-        Text("upload.csdn.cookie", { dependencies: Dep.true("upload.csdn.enabled") }),
+        Text("upload.csdn.cookie").ShowIf(When.true("upload.csdn.enabled")),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_ripgrep = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Switch("BACKSPACE_TO_HIDE"),
-    ),
-    BOXES.settingHandler,
+const schema_ripgrep = () => [
+    Frag.PluginBase(true),
+    Switch("BACKSPACE_TO_HIDE"),
+    Frag.SettingHandler(),
 ]
 
-const schema_static_markers = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Switch("STATIC_DEFAULT"),
-    ),
-    CheckboxBox("STATIC_MARKERS", OPTS.static_markers.STATIC_MARKERS, { columns: 4 }),
-    BOXES.settingHandler,
+const schema_static_markers = () => [
+    Frag.PluginBase(true),
+    Switch("STATIC_DEFAULT"),
+    Checkbox("STATIC_MARKERS").Options(["strong", "em", "del", "underline", "superscript", "subscript", "code", "image", "link", "footnote", "highlight", "emoji", "inlineMath", "inlineHTML"]).Columns(4),
+    Frag.SettingHandler(),
 ]
 
-const schema_sidebar_enhance = [
-    BOXES.pluginLite,
-    UntitledBox(
+const schema_sidebar_enhance = () => [
+    Frag.PluginBase(),
+    Group(
         Switch("CTRL_WHEEL_TO_SCROLL_SIDEBAR"),
         Switch("SORTABLE_OUTLINE"),
-        Select("OUTLINE_FOLD_STATE", OPTS.sidebar_enhance.OUTLINE_FOLD_STATE),
+        Select("OUTLINE_FOLD_STATE").Options(["alwaysUnfold", "alwaysFold", "remember"]),
     ),
-    UntitledBox(
+    Group(
         Switch("ENABLE_FILE_COUNT"),
-        Text("FONT_WEIGHT", DEPS.countFile),
-        Text("TEXT_COLOR", DEPS.countFile),
-        Text("BACKGROUND_COLOR", DEPS.countFile),
+        Text("FONT_WEIGHT").ShowIf(Deps.countFile),
+        Text("TEXT_COLOR").ShowIf(Deps.countFile),
+        Text("BACKGROUND_COLOR").ShowIf(Deps.countFile),
         Divider(),
-        Array_("COUNT_EXT", DEPS.countFile),
-        Array_("IGNORE_FOLDERS", DEPS.countFile),
+        Array_("COUNT_EXT").ShowIf(Deps.countFile),
+        Array_("IGNORE_FOLDERS").ShowIf(Deps.countFile),
         Divider(),
-        Switch("FOLLOW_SYMBOLIC_LINKS", DEPS.countFile),
-        Integer("MIN_FILES_TO_DISPLAY", { tooltip: "ignoreMinNum", min: 1, ...DEPS.countFile }),
-        Integer("MAX_SIZE", { tooltip: "maxBytes", unit: UNITS.byte, min: 1, max: 2000000, ...DEPS.countFile }),
-        Integer("MAX_ENTITIES", { min: 100, ...DEPS.countFile }),
-        Integer("CONCURRENCY_LIMIT", { min: 1, ...DEPS.countFile }),
+        Switch("FOLLOW_SYMBOLIC_LINKS").ShowIf(Deps.countFile),
+        Integer("MIN_FILES_TO_DISPLAY").Min(1).ShowIf(Deps.countFile).Tooltip("ignoreMinNum"),
+        Integer("MAX_SIZE").Unit(Units.byte).Min(1).Max(2000000).Tooltip("maxBytes").ShowIf(Deps.countFile),
+        Integer("MAX_ENTITIES").Min(100).ShowIf(Deps.countFile),
+        Integer("CONCURRENCY_LIMIT").Min(1).ShowIf(Deps.countFile),
     ),
-    UntitledBox(
+    Group(
         Array_("HIDDEN_NODE_PATTERNS"),
         Divider(),
         Switch("DISPLAY_NON_MARKDOWN_FILES"),
-        Array_("OPEN_BY_TYPORA_EXT", { dependencies: Dep.true("DISPLAY_NON_MARKDOWN_FILES") }),
-        Array_("OPEN_BY_SYSTEM_EXT", { dependencies: Dep.true("DISPLAY_NON_MARKDOWN_FILES") }),
-        Switch("CUSTOMIZE_SIDEBAR_ICONS", { dependencies: Dep.true("DISPLAY_NON_MARKDOWN_FILES") }),
+        Array_("OPEN_BY_TYPORA_EXT").ShowIf(When.true("DISPLAY_NON_MARKDOWN_FILES")),
+        Array_("OPEN_BY_SYSTEM_EXT").ShowIf(When.true("DISPLAY_NON_MARKDOWN_FILES")),
+        Switch("CUSTOMIZE_SIDEBAR_ICONS").ShowIf(When.true("DISPLAY_NON_MARKDOWN_FILES")),
     ),
-    TableBox(
-        "SIDEBAR_ICONS",
-        ["extensions", "icon"],
-        [
-            UntitledBox(
+    Table("SIDEBAR_ICONS")
+        .Headers(["extensions", "icon"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
                 Text("icon"),
                 Array_("extensions"),
             ),
-        ],
-        {
+        ])
+        .DefaultValues({
             enable: true,
             icon: "fa fa-file-text-o",
             extensions: [],
-        },
-        { dependencies: Dep.and(Dep.true("CUSTOMIZE_SIDEBAR_ICONS"), Dep.follow("CUSTOMIZE_SIDEBAR_ICONS")) },
-    ),
-    BOXES.settingHandler,
+        })
+        .ShowIf(When.and(When.true("CUSTOMIZE_SIDEBAR_ICONS"), When.follow("CUSTOMIZE_SIDEBAR_ICONS"))),
+    Frag.SettingHandler(),
 ]
 
-const schema_cursor_history = [
-    BOXES.pluginLite,
-    TitledBox(
-        TITLES.hotkey,
+const schema_cursor_history = () => [
+    Frag.PluginBase(),
+    Group("hotkey",
         Hotkey("HOTKEY_GO_FORWARD"),
         Hotkey("HOTKEY_GO_BACK"),
     ),
-    UntitledBox(
-        Integer("MAX_HISTORY_ENTRIES", { min: 1, step: 1 }),
-    ),
-    BOXES.settingHandler,
+    Integer("MAX_HISTORY_ENTRIES").Min(1).Step(1),
+    Frag.SettingHandler(),
 ]
 
-const schema_json_rpc = [
-    UntitledBox(
-        Switch("ENABLE", { tooltip: Tip.action("viewJsonRPCReadme", "fa fa-flask") }),
-        FIELDS.NAME,
+const schema_json_rpc = () => [
+    Group(
+        Switch("ENABLE").ActionTooltip("viewJsonRPCReadme", "fa fa-flask"),
+        Text("NAME").Placeholder("defaultIfEmpty"),
     ),
-    TitledBox(
-        "rpcServer",
+    Group("rpcServer",
         Switch("SERVER_OPTIONS.strict"),
         Text("SERVER_OPTIONS.host"),
-        Integer("SERVER_OPTIONS.port", { min: 0, max: 65535, step: 1 }),
+        Integer("SERVER_OPTIONS.port").Min(0).Max(65535).Step(1),
         Text("SERVER_OPTIONS.path"),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_updater = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Integer("NETWORK_REQUEST_TIMEOUT", { unit: UNITS.millisecond, min: 30000 }),
+const schema_updater = () => [
+    Frag.PluginBase(true),
+    Group(
+        Integer("NETWORK_REQUEST_TIMEOUT").Unit(Units.millisecond).Min(30000),
         Text("PROXY"),
     ),
-    TitledBox(
-        "autoUpdate",
+    Group("autoUpdate",
         Switch("AUTO_UPDATE"),
-        Integer("UPDATE_LOOP_INTERVAL", { tooltip: "loopInterval", unit: UNITS.millisecond, min: -1, dependencies: Dep.true("AUTO_UPDATE") }),
-        Integer("START_UPDATE_INTERVAL", { tooltip: "waitInterval", unit: UNITS.millisecond, min: -1, dependencies: Dep.true("AUTO_UPDATE") }),
+        Integer("UPDATE_LOOP_INTERVAL").Unit(Units.millisecond).Min(-1).Tooltip("loopInterval").ShowIf(When.true("AUTO_UPDATE")),
+        Integer("START_UPDATE_INTERVAL").Unit(Units.millisecond).Min(-1).Tooltip("waitInterval").ShowIf(When.true("AUTO_UPDATE")),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_test = [
-    BOXES.pluginLite,
-    BOXES.settingHandler,
+const schema_test = () => [
+    Frag.PluginBase(),
+    Frag.SettingHandler(),
 ]
 
-const schema_kanban = [
-    BOXES.pluginFull,
-    TitledBox(
-        "fence",
-        FIELDS.LANGUAGE,
-        FIELDS.INTERACTIVE_MODE,
+const schema_kanban = () => [
+    Frag.PluginBase(true),
+    Group("fence",
+        Text("LANGUAGE").Protect(),
+        Switch("INTERACTIVE_MODE"),
         Switch("STRICT_MODE"),
     ),
-    TitledBox(
-        "kanbanStyle",
-        Integer("KANBAN_WIDTH", { unit: UNITS.pixel, min: 1 }),
-        Integer("KANBAN_MAX_HEIGHT", { unit: UNITS.pixel, min: 1 }),
-        Float("KANBAN_TASK_DESC_MAX_HEIGHT", { tooltip: "minusOneMeansShowAll", unit: UNITS.em, min: -1 }),
+    Group("kanbanStyle",
+        Integer("KANBAN_WIDTH").Unit(Units.pixel).Min(1),
+        Integer("KANBAN_MAX_HEIGHT").Unit(Units.pixel).Min(1),
+        Float("KANBAN_TASK_DESC_MAX_HEIGHT").Unit(Units.em).Min(-1).Tooltip("minusOneMeansShowAll"),
         Switch("HIDE_DESC_WHEN_EMPTY"),
         Switch("WRAP"),
         Switch("ALLOW_MARKDOWN_INLINE_STYLE"),
         Palette("KANBAN_COLOR"),
         Palette("TASK_COLOR"),
     ),
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_chat = [
-    BOXES.pluginFull,
-    TitledBox(
-        "fence",
-        FIELDS.LANGUAGE,
-        FIELDS.INTERACTIVE_MODE,
+const schema_chat = () => [
+    Frag.PluginBase(true),
+    Group("fence",
+        Text("LANGUAGE").Protect(),
+        Switch("INTERACTIVE_MODE"),
         Switch("DEFAULT_OPTIONS.useStrict"),
     ),
-    TitledBox(
-        "defaultOption",
+    Group("defaultOption",
         Switch("DEFAULT_OPTIONS.showNickname"),
         Switch("DEFAULT_OPTIONS.showAvatar"),
         Switch("DEFAULT_OPTIONS.notAllowShowTime"),
@@ -1692,15 +1184,14 @@ const schema_chat = [
         Text("DEFAULT_OPTIONS.senderNickname"),
         Text("DEFAULT_OPTIONS.timeNickname"),
     ),
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_timeline = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    TitledBox(
-        TITLES.diagramStyle,
+const schema_timeline = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Group("diagramStyle",
         Text("BACKGROUND_COLOR"),
         Text("TITLE_COLOR"),
         Text("TITLE_FONT_SIZE"),
@@ -1712,356 +1203,269 @@ const schema_timeline = [
         Text("TIME_COLOR"),
         Text("CIRCLE_TOP"),
     ),
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_echarts = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    BOXES.chartStyle,
-    BOXES.TEMPLATE,
-    TitledBox(
-        TITLES.advanced,
-        Select("LOCALE", OPTS.echarts.LOCALE),
-        Select("THEME", OPTS.echarts.THEME),
-        Select("RENDERER", OPTS.echarts.RENDERER, { tooltip: Tip.action("chooseEchartsRenderer") }),
-        Select("EXPORT_TYPE", OPTS.echarts.EXPORT_TYPE),
+const schema_echarts = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Frag.ChartStyle(),
+    Frag.Template(),
+    Group("advanced",
+        Segment("LOCALE").Options(["en", "zh"]),
+        Segment("THEME").Options(["light", "dark"]),
+        Segment("RENDERER").Options(["svg", "canvas"]).ActionTooltip("chooseEchartsRenderer"),
+        Select("EXPORT_TYPE").Options(["svg", "png", "jpg"]),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_chart = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    TitledBox(
-        TITLES.diagramStyle,
-        Select("CHART_ALIGN", OPTS.chart.CHART_ALIGN),
-        FIELDS.DEFAULT_FENCE_HEIGHT,
-        FIELDS.DEFAULT_FENCE_BACKGROUND_COLOR,
+const schema_chart = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Group("diagramStyle",
+        Segment("CHART_ALIGN").Options(["left", "center", "right"]),
+        Text("DEFAULT_FENCE_HEIGHT"),
+        Text("DEFAULT_FENCE_BACKGROUND_COLOR"),
     ),
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_wavedrom = [
-    BOXES.pluginFull,
-    TitledBox(
-        TITLES.languageMode,
-        FIELDS.LANGUAGE,
-        FIELDS.INTERACTIVE_MODE,
+const schema_wavedrom = () => [
+    Frag.PluginBase(true),
+    Group("languageMode",
+        Text("LANGUAGE").Protect(),
+        Switch("INTERACTIVE_MODE"),
         Switch("SAFE_MODE"),
     ),
-    TitledBox(
-        TITLES.diagramStyle,
-        Select("CHART_ALIGN", OPTS.wavedrom.CHART_ALIGN),
-        FIELDS.DEFAULT_FENCE_HEIGHT,
-        FIELDS.DEFAULT_FENCE_BACKGROUND_COLOR,
+    Group("diagramStyle",
+        Segment("CHART_ALIGN").Options(["left", "center", "right"]),
+        Text("DEFAULT_FENCE_HEIGHT"),
+        Text("DEFAULT_FENCE_BACKGROUND_COLOR"),
     ),
-    BOXES.TEMPLATE,
-    ArrayBox("SKIN_FILES", { tooltip: Tip.action("downloadWaveDromSkins", "fa fa-download") }),
-    BOXES.settingHandler,
+    Frag.Template(),
+    Array_("SKIN_FILES").ActionTooltip("downloadWaveDromSkins", "fa fa-download"),
+    Frag.SettingHandler(),
 ]
 
-const schema_calendar = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    BOXES.chartStyle,
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+const schema_calendar = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Frag.ChartStyle(),
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_abc = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    BOXES.chartStyle,
-    BOXES.TEMPLATE,
-    DictBox("VISUAL_OPTIONS", null, { tooltip: Tip.action("viewAbcVisualOptionsManual") }),
-    BOXES.settingHandler,
+const schema_abc = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Frag.ChartStyle(),
+    Frag.Template(),
+    Dict("VISUAL_OPTIONS").ActionTooltip("viewAbcVisualOptionsManual"),
+    Frag.SettingHandler(),
 ]
 
-const schema_drawIO = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    BOXES.chartStyle,
-    BOXES.TEMPLATE,
-    TitledBox(
-        TITLES.advanced,
+const schema_drawIO = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Frag.ChartStyle(),
+    Frag.Template(),
+    Group("advanced",
         Text("RESOURCE_URI"),
         Text("PROXY"),
-        Integer("SERVER_TIMEOUT", { unit: UNITS.millisecond, min: 1000 }),
-        Integer("CACHED_URL_COUNT", { min: 1 }),
+        Integer("SERVER_TIMEOUT").Unit(Units.millisecond).Min(1000),
+        Integer("CACHED_URL_COUNT").Min(1),
     ),
-    BOXES.settingHandler,
+    Frag.SettingHandler(),
 ]
 
-const schema_plantUML = [
-    UntitledBox(
-        Switch("ENABLE", { tooltip: Tip.action("installPlantUMLServer", "fa fa-flask") }),
-        FIELDS.NAME,
-        FIELDS.HOTKEY,
+const schema_plantUML = () => [
+    Group(
+        Switch("ENABLE").ActionTooltip("installPlantUMLServer", "fa fa-flask"),
+        Text("NAME").Placeholder("defaultIfEmpty"),
+        Hotkey("HOTKEY"),
     ),
-    UntitledBox(
+    Group(
         Text("SERVER_URL"),
-        Integer("SERVER_TIMEOUT", { unit: UNITS.millisecond, min: 1000 }),
+        Integer("SERVER_TIMEOUT").Unit(Units.millisecond).Min(1000),
         Text("PROXY"),
-        Integer("CACHED_URL_COUNT", { min: 1 }),
-        Select("OUTPUT_FORMAT", OPTS.plantUML.OUTPUT_FORMAT),
+        Integer("CACHED_URL_COUNT").Min(1),
+        Segment("OUTPUT_FORMAT").Options(["svg", "png", "txt"]),
     ),
-    BOXES.langMode,
-    BOXES.chartStyle,
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+    Frag.LangMode(),
+    Frag.ChartStyle(),
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_marp = [
-    BOXES.pluginFull,
-    BOXES.langMode,
-    DictBox("MARP_CORE_OPTIONS", null, { tooltip: Tip.action("viewMarpOptions") }),
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+const schema_marp = () => [
+    Frag.PluginBase(true),
+    Frag.LangMode(),
+    Dict("MARP_CORE_OPTIONS").ActionTooltip("viewMarpOptions"),
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_callouts = [
-    BOXES.pluginFull,
-    TitledBox(
-        TITLES.style,
+const schema_callouts = () => [
+    Frag.PluginBase(true),
+    Group("style",
         Switch("SET_TITLE_COLOR"),
         Text("BOX_SHADOW"),
     ),
-    TitledBox(
-        "mouseHover",
+    Group("mouseHover",
         Switch("HOVER_TO_SHOW_FOLD_CALLOUT"),
     ),
-    TitledBox(
-        "fontFamily",
+    Group("fontFamily",
         Text("FONT_FAMILY"),
-        Switch("USE_NETWORK_ICON_WHEN_EXPORTING", { tooltip: "missingFont" }),
-        Text("NETWORK_ICON_URL", { dependencies: Dep.true("USE_NETWORK_ICON_WHEN_EXPORTING") }),
+        Switch("USE_NETWORK_ICON_WHEN_EXPORTING").Tooltip("missingFont"),
+        Text("NETWORK_ICON_URL").ShowIf(When.true("USE_NETWORK_ICON_WHEN_EXPORTING")),
     ),
-    TitledBox(
-        "defaultOptions",
+    Group("defaultOptions",
         Color("DEFAULT_BACKGROUND_COLOR"),
         Color("DEFAULT_LEFT_LINE_COLOR"),
         Text("DEFAULT_ICON"),
     ),
-    TableBox(
-        "CALLOUTS",
-        ["type", "icon", "background_color"],
-        [
-            UntitledBox(
+    Table("CALLOUTS")
+        .Headers(["type", "icon", "background_color"])
+        .NestedBoxes([
+            Group(
                 Text("type"),
                 Text("icon"),
                 Color("background_color"),
                 Color("left_line_color"),
             ),
-        ],
-        {
-            type: "",
-            icon: "",
-            background_color: "",
-            left_line_color: "",
-        },
-    ),
-    BOXES.TEMPLATE,
-    BOXES.settingHandler,
+        ])
+        .DefaultValues({ type: "", icon: "", background_color: "", left_line_color: "" }),
+    Frag.Template(),
+    Frag.SettingHandler(),
 ]
 
-const schema_templater = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Switch("AUTO_OPEN"),
-    ),
-    TableBox(
-        "TEMPLATE_VARIABLES",
-        ["name", "callback"],
-        [
-            UntitledBox(
-                Switch("enable"),
-                Text("name"),
-            ),
-            CodeBox("callback"),
-        ],
-        {
-            enable: true,
-            name: "",
-            callback: "(...args) => console.log(`Invoke with params: ${args}`)",
-        },
-    ),
-    TableBox(
-        "TEMPLATE",
-        ["name", "text"],
-        [
-            UntitledBox(
-                Text("name"),
-            ),
-            TextareaBox("text", { rows: 10 }),
-        ],
-        {
-            name: "",
-            text: "",
-        },
-    ),
-    ArrayBox("TEMPLATE_FOLDERS"),
-    BOXES.settingHandler,
-]
-
-const schema_right_outline = [
-    BOXES.pluginFull,
-    UntitledBox(
-        Switch("DEFAULT_SHOW_OUTLINE"),
-        Switch("REMOVE_HEADER_STYLES"),
-        Switch("SORTABLE"),
-        Switch("RIGHT_CLICK_OUTLINE_BUTTON_TO_TOGGLE"),
-        Range("DEFAULT_WIDTH_PERCENT", PROPS.percent),
-    ),
-    TransferBox("TITLE_BAR_BUTTONS", OPTS.right_outline.TITLE_BAR_BUTTONS),
-    TitledBox(
-        "displayHeader",
-        Switch("INCLUDE_HEADINGS.image", { dependencies: Dep.contains("TITLE_BAR_BUTTONS", "image") }),
-        Switch("INCLUDE_HEADINGS.table", { dependencies: Dep.contains("TITLE_BAR_BUTTONS", "table") }),
-        Switch("INCLUDE_HEADINGS.fence", { dependencies: Dep.contains("TITLE_BAR_BUTTONS", "fence") }),
-        Switch("INCLUDE_HEADINGS.link", { dependencies: Dep.contains("TITLE_BAR_BUTTONS", "link") }),
-        Switch("INCLUDE_HEADINGS.math", { dependencies: Dep.contains("TITLE_BAR_BUTTONS", "math") }),
-    ),
-    BOXES.settingHandler,
-]
-
-const schema_image_viewer = [
-    BOXES.pluginFull,
-    TitledBox(
-        TITLES.style,
-        Range("MASK_BACKGROUND_OPACITY", { min: 0, max: 1, step: 0.05 }),
-        Range("IMAGE_MAX_WIDTH", PROPS.percent),
-        Range("IMAGE_MAX_HEIGHT", PROPS.percent),
+const schema_image_viewer = () => [
+    Frag.PluginBase(true),
+    Group("style",
+        Range("MASK_BACKGROUND_OPACITY").Min(0).Max(1).Step(0.05),
+        Range("IMAGE_MAX_WIDTH").Percent(),
+        Range("IMAGE_MAX_HEIGHT").Percent(),
         Text("THUMBNAIL_HEIGHT"),
-        Integer("BLUR_LEVEL", { unit: UNITS.pixel, min: 1 }),
-        Integer("PRELOAD_THUMBNAIL_COUNT", { min: 0 }),
-        Integer("WATERFALL_COLUMNS", { min: 0 }),
+        Integer("BLUR_LEVEL").Unit(Units.pixel).Min(1),
+        Integer("PRELOAD_THUMBNAIL_COUNT").Min(0),
+        Integer("WATERFALL_COLUMNS").Min(0),
     ),
-    TitledBox(
-        "component",
+    Group("component",
         Switch("SHOW_THUMBNAIL_NAV"),
-        Select("TOOL_POSITION", OPTS.image_viewer.TOOL_POSITION),
+        Segment("TOOL_POSITION").Options(["bottom", "top"]),
     ),
-    TransferBox("SHOW_MESSAGE", OPTS.image_viewer.SHOW_MESSAGE),
-    TransferBox("TOOL_FUNCTION", OPTS.image_viewer.operations, { minItems: 1 }),
-    TitledBox(
-        "behavior",
+    Transfer("SHOW_MESSAGE").Options(["index", "title", "size"]),
+    Transfer("TOOL_FUNCTION").Options(Opts.imageViewerTools).MinItems(1).OptionScope("operations"),
+    Group("behavior",
         Switch("SKIP_BROKEN_IMAGES"),
-        Select("FIRST_IMAGE_STRATEGIES", OPTS.image_viewer.FIRST_IMAGE_STRATEGIES, { minItems: 1 }),
-        Select("THUMBNAIL_OBJECT_FIT", OPTS.image_viewer.THUMBNAIL_OBJECT_FIT),
-        Integer("AUTO_PLAY_INTERVAL", { unit: UNITS.second, min: 1 }),
+        Select("FIRST_IMAGE_STRATEGIES").Options(["inViewBoxImage", "closestViewBoxImage", "firstImage"]).MinItems(1),
+        Select("THUMBNAIL_OBJECT_FIT").Options(["fill", "contain", "cover", "scale-down"]),
+        Integer("AUTO_PLAY_INTERVAL").Unit(Units.second).Min(1),
     ),
-    TitledBox(
-        "adjustScale",
-        Float("ZOOM_SCALE", { min: 0.01 }),
-        Integer("ROTATE_SCALE", { unit: UNITS.degree, min: 1 }),
-        Integer("SKEW_SCALE", { unit: UNITS.degree, min: 1 }),
-        Integer("TRANSLATE_SCALE", { unit: UNITS.pixel, min: 1 }),
+    Group("adjustScale",
+        Float("ZOOM_SCALE").Min(0.01),
+        Integer("ROTATE_SCALE").Unit(Units.degree).Min(1),
+        Integer("SKEW_SCALE").Unit(Units.degree).Min(1),
+        Integer("TRANSLATE_SCALE").Unit(Units.pixel).Min(1),
     ),
-    TitledBox(
-        "mouseEvent",
+    Group("mouseEvent",
         Switch("CLICK_MASK_TO_EXIT"),
-        Select("MOUSEDOWN_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("MOUSEDOWN_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("MOUSEDOWN_FUNCTION.2", OPTS.image_viewer.operations),
-        Select("CTRL_MOUSEDOWN_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("CTRL_MOUSEDOWN_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("CTRL_MOUSEDOWN_FUNCTION.2", OPTS.image_viewer.operations),
-        Select("SHIFT_MOUSEDOWN_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("SHIFT_MOUSEDOWN_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("SHIFT_MOUSEDOWN_FUNCTION.2", OPTS.image_viewer.operations),
-        Select("ALT_MOUSEDOWN_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("ALT_MOUSEDOWN_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("ALT_MOUSEDOWN_FUNCTION.2", OPTS.image_viewer.operations),
-        Select("WHEEL_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("WHEEL_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("CTRL_WHEEL_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("CTRL_WHEEL_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("SHIFT_WHEEL_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("SHIFT_WHEEL_FUNCTION.1", OPTS.image_viewer.operations),
-        Select("ALT_WHEEL_FUNCTION.0", OPTS.image_viewer.operations),
-        Select("ALT_WHEEL_FUNCTION.1", OPTS.image_viewer.operations),
+        Select("MOUSEDOWN_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("MOUSEDOWN_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("MOUSEDOWN_FUNCTION.2").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("CTRL_MOUSEDOWN_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("CTRL_MOUSEDOWN_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("CTRL_MOUSEDOWN_FUNCTION.2").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("SHIFT_MOUSEDOWN_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("SHIFT_MOUSEDOWN_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("SHIFT_MOUSEDOWN_FUNCTION.2").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("ALT_MOUSEDOWN_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("ALT_MOUSEDOWN_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("ALT_MOUSEDOWN_FUNCTION.2").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("WHEEL_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("WHEEL_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("CTRL_WHEEL_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("CTRL_WHEEL_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("SHIFT_WHEEL_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("SHIFT_WHEEL_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("ALT_WHEEL_FUNCTION.0").Options(Opts.imageViewerTools).OptionScope("operations"),
+        Select("ALT_WHEEL_FUNCTION.1").Options(Opts.imageViewerTools).OptionScope("operations"),
     ),
-    TableBox(
-        "HOTKEY_FUNCTION",
-        ["hotkey", "fn"],
-        [
-            UntitledBox(
-                Select("fn", OPTS.image_viewer.operations),
+    Table("HOTKEY_FUNCTION")
+        .Headers(["hotkey", "fn"])
+        .NestedBoxes([
+            Group(
+                Select("fn").Options(Opts.imageViewerTools).OptionScope("operations"),
                 Hotkey("hotkey"),
             ),
-        ],
-        { hotkey: "", fn: "nextImage" },
-    ),
-    BOXES.settingHandler,
+        ])
+        .DefaultValues({ hotkey: "", fn: "nextImage" }),
+    Frag.SettingHandler(),
 ]
 
-const schema_markdownlint = [
-    BOXES.pluginFull,
-    TitledBox(
-        "detectAndFix",
+const schema_markdownlint = () => [
+    Frag.PluginBase(true),
+    Group("detectAndFix",
         Switch("TRANSLATE"),
         Switch("RIGHT_CLICK_TABLE_TO_TOGGLE_SOURCE_MODE"),
-        Select("TITLE_BAR_BUTTONS", OPTS.markdownlint.TITLE_BAR_BUTTONS),
-        Select("COLUMNS", OPTS.markdownlint.COLUMNS, { minItems: 1 }),
-        Select("RESULT_ORDER_BY", OPTS.markdownlint.RESULT_ORDER_BY),
-        Select("TOOLS", OPTS.markdownlint.TOOLS, { minItems: 1 }),
+        Select("TITLE_BAR_BUTTONS").Options(["settings", "detailAll", "fixAll", "toggleSourceMode", "refresh", "close"]),
+        Select("COLUMNS").Options(["idx", "line", "rule", "desc", "ops"]).MinItems(1),
+        Select("RESULT_ORDER_BY").Options(["index", "lineNumber", "ruleName", "ruleDesc"]),
+        Select("TOOLS").Options(["info", "locate", "fix"]).MinItems(1),
         Hotkey("HOTKEY_FIX_LINT"),
     ),
-    TitledBox(
-        "indicator",
+    Group("indicator",
         Switch("USE_INDICATOR_BUTTON"),
-        Switch("RIGHT_CLICK_BUTTON_TO_FIX", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Text("BUTTON_WIDTH", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Text("BUTTON_HEIGHT", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Text("BUTTON_RIGHT", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Text("BUTTON_BORDER_RADIUS", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Range("BUTTON_OPACITY", { min: 0, max: 1, step: 0.05, dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Color("BUTTON_PASS_COLOR", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
-        Color("BUTTON_ERROR_COLOR", { dependencies: Dep.true("USE_INDICATOR_BUTTON") }),
+        Switch("RIGHT_CLICK_BUTTON_TO_FIX").ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Text("BUTTON_WIDTH").ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Text("BUTTON_HEIGHT").ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Text("BUTTON_RIGHT").ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Text("BUTTON_BORDER_RADIUS").ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Range("BUTTON_OPACITY").Min(0).Max(1).Step(0.05).ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Color("BUTTON_PASS_COLOR").ShowIf(When.true("USE_INDICATOR_BUTTON")),
+        Color("BUTTON_ERROR_COLOR").ShowIf(When.true("USE_INDICATOR_BUTTON")),
     ),
-    DictBox("RULE_CONFIG", null, { tooltip: Tip.action("viewMarkdownlintRules") }),
-    ArrayBox("CUSTOM_RULE_FILES"),
-    BOXES.settingHandler,
+    Dict("RULE_CONFIG").ActionTooltip("viewMarkdownlintRules"),
+    Array_("CUSTOM_RULE_FILES"),
+    Frag.SettingHandler(),
 ]
 
-const schema_action_buttons = [
-    BOXES.pluginFull,
-    TitledBox(
-        "buttonStyle",
+const schema_action_buttons = () => [
+    Frag.PluginBase(true),
+    Group("buttonStyle",
         Text("BUTTON_SIZE"),
         Text("BUTTON_ICON_SIZE"),
         Text("BUTTON_BORDER_RADIUS"),
         Text("BUTTON_BOX_SHADOW"),
         Text("BUTTON_BOX_SHADOW_ON_HOVER"),
-        Divider("layout"),
+        Divider().Divider("layout"),
         Text("BUTTON_GAP"),
         Text("POSITION_RIGHT"),
         Text("POSITION_BOTTOM"),
-        Divider("interaction"),
+        Divider().Divider("interaction"),
         Switch("SUPPORT_RIGHT_CLICK"),
         Switch("HIDE_BUTTON_HINT"),
     ),
-    TableBox(
-        "BUTTONS",
-        ["coordinate", "icon"],
-        [
-            UntitledBox(
+    Table("BUTTONS")
+        .Headers(["coordinate", "icon"])
+        .NestedBoxes([
+            Group(
                 Switch("enable"),
-                Integer("coordinate.0", { tooltip: "coord0", min: 0 }),
-                Integer("coordinate.1", { tooltip: "coord1", min: 0 }),
+                Integer("coordinate.0").Min(0).Tooltip("coord0"),
+                Integer("coordinate.1").Min(0).Tooltip("coord1"),
                 Icon("icon"),
                 Text("size"),
                 Text("color"),
                 Text("bgColor"),
                 Text("hint"),
             ),
-            CodeBox("callback", { tooltip: "exclusive", dependencies: Dep.bool("evil", false) }),
-            CodeBox("evil", { placeholder: "customCallback", dependencies: Dep.bool("callback", false) }),
-        ],
-        {
+            Code("callback").Tooltip("exclusive").ShowIf(When.bool("evil", false)),
+            Code("evil").Placeholder("customCallback").ShowIf(When.bool("callback", false)),
+        ])
+        .DefaultValues({
             enable: true,
             coordinate: [0, 0],
             icon: "fa fa-bomb",
@@ -2071,12 +1475,11 @@ const schema_action_buttons = [
             hint: "",
             callback: "",
             evil: "",
-        },
-    ),
-    BOXES.settingHandler,
+        }),
+    Frag.SettingHandler(),
 ]
 
-const schemas = {
+const RAW_SCHEMA_FNS = {
     global: schema_global,
     window_tab: schema_window_tab,
     search_multi: schema_search_multi,
@@ -2141,96 +1544,85 @@ const schemas = {
     callouts: schema_callouts,
 }
 
-const i18n = (
-    schemas = schemas,
-    i18nData = require("../global/locales/en.json"),
-) => {
-    const PREFIX_DEPENDENT_PROPS = { label: "$label" }
-    const SPECIAL_PROPS = { options: "$option", thMap: "$label" }
-    const GLOBAL_PROPS = { explain: "$explain", placeholder: "$placeholder", hintHeader: "$hintHeader", hintDetail: "$hintDetail", divider: "$divider", unit: "$unit" }
-    const TAB_PROPS = { tabs: "$tab" }
-    const NESTED_PROPS = ["nestedBoxes", "subSchema"]
+const mapTree = (schemas, visitBox = box => box, visitField = field => field, prefix = "") => schemas.map(box => {
+    const newBox = visitBox(box, prefix)
+    if (!Array.isArray(newBox.fields)) return newBox
 
-    const translateTitle = (item, label, t, prefix) => {
-        if (label) {
-            const i18nKey = prefix ? `${prefix}.${label}` : label
-            item.title = t(`$label.${i18nKey}`)
-        } else if (item.title) {
-            const i18nKey = prefix ? `${prefix}.${item.title}` : item.title
-            item.title = t(`$title.${i18nKey}`)
+    return {
+        ...newBox,
+        fields: newBox.fields.map(field => {
+            const newField = visitField(field, prefix)
+            const nextPrefix = newField.key || prefix
+            const mapNested = (tree) => Array.isArray(tree) ? mapTree(tree, visitBox, visitField, nextPrefix) : tree
+            return {
+                ...newField,
+                ...(newField.nestedBoxes && { nestedBoxes: mapNested(newField.nestedBoxes) }),
+                ...(newField.subSchema && { subSchema: mapNested(newField.subSchema) }),
+                ...(newField.tabs && { tabs: newField.tabs.map(tab => ({ ...tab, schema: mapNested(tab.schema || []) })) }),
+            }
+        }),
+    }
+})
+
+const i18n = (boxes, t) => {
+    const mapTooltip = (tooltip) =>
+        (Array.isArray(tooltip) ? tooltip : [tooltip]).map(tip => {
+            if (typeof tip === "string") return t(`$tooltip.${tip}`)
+            const textKey = tip?.text ?? tip?.action
+            return textKey ? { ...tip, text: t(`$tooltip.${textKey}`) } : tip
+        })
+
+    const mapRecord = (record, tPrefix) =>
+        (record && typeof record === "object" && !Array.isArray(record))
+            ? Object.fromEntries(Object.entries(record).map(([k, v]) => [k, t(`${tPrefix}.${v}`)]))
+            : record
+
+    const mapOptions = (options, optScope) => {
+        if (Array.isArray(options)) {
+            return Object.fromEntries(options.map(opt => [opt, t(`$option.${optScope}.${opt}`)]))
         }
-    }
-    const translateTooltip = (item, t) => {
-        if (item.tooltip == null) return
-        const tips = Array.isArray(item.tooltip) ? item.tooltip : [item.tooltip]
-        item.tooltip = tips.map(tip => {
-            if (typeof tip === "string") {
-                return t(`$tooltip.${tip}`)
-            }
-            if (typeof tip?.text === "string") {
-                tip = { ...tip, text: t(`$tooltip.${tip.text}`) }
-            }
-            if (typeof tip?.action === "string" && tip?.text == null) {
-                tip = { ...tip, text: t(`$tooltip.${tip.action}`) }
-            }
-            return tip
-        })
-    }
-    const translateFields = (box, t, prefix) => {
-        if (!Array.isArray(box.fields)) return
-        box.fields = box.fields.map(field => {
-            const newField = { ...field }
-            translateTooltip(newField, t)
-            Object.entries(PREFIX_DEPENDENT_PROPS).forEach(([prop, i18nPrefix]) => {
-                if (newField[prop] != null) {
-                    const key = prefix ? `${prefix}.${newField[prop]}` : newField[prop]
-                    newField[prop] = t(`${i18nPrefix}.${key}`)
-                }
-            })
-            Object.entries(GLOBAL_PROPS).forEach(([prop, i18nPrefix]) => {
-                if (newField[prop] != null) {
-                    newField[prop] = t(`${i18nPrefix}.${newField[prop]}`)
-                }
-            })
-            Object.entries(SPECIAL_PROPS).forEach(([prop, i18nPrefix]) => {
-                if (newField[prop] != null && typeof newField[prop] === "object" && !Array.isArray(newField[prop])) {
-                    newField[prop] = Object.fromEntries(
-                        Object.entries(newField[prop]).map(([k, v]) => [k, t(`${i18nPrefix}.${v}`)]),
-                    )
-                }
-            })
-            Object.entries(TAB_PROPS).forEach(([prop, i18nPrefix]) => {
-                if (Array.isArray(newField[prop])) {
-                    newField[prop].label = t(`${i18nPrefix}.${newField[prop].label}`)
-                    newField[prop].schema = newField[prop].schema.map(nested => translateBox(nested, t, newField.key))
-                }
-            })
-            NESTED_PROPS.forEach(prop => {
-                if (Array.isArray(newField[prop])) {
-                    newField[prop] = newField[prop].map(nested => translateBox(nested, t, newField.key))
-                }
-            })
-            return newField
-        })
-    }
-    const translateBox = (box, t, prefix = "") => {
-        const { label, ...newBox } = { ...box }
-        translateTitle(newBox, label, t, prefix)
-        translateTooltip(newBox, t)
-        translateFields(newBox, t, prefix)
-        return newBox
+        if (options && typeof options === "object") {
+            return Object.fromEntries(Object.entries(options).map(([k, v]) => [k, t(`$option.${optScope}.${v}`)]))
+        }
+        return options
     }
 
-    return Object.fromEntries(
-        Object.entries(schemas).map(([fixedName, boxes]) => {
-            const t = (i18nKey) => i18nData[fixedName]?.[i18nKey] ?? i18nData.settings?.[i18nKey] ?? i18nKey
-            const translatedBoxes = boxes.map(box => translateBox(box, t))
-            return [fixedName, translatedBoxes]
+    return mapTree(
+        boxes,
+        ({ label, title, tooltip, [I18N_DICT]: dictType, ...box }, prefix) => {
+            const titleKey = label || title
+            return {
+                ...box,
+                ...(titleKey != null && { title: t(`$${dictType || "title"}.${prefix ? `${prefix}.${titleKey}` : titleKey}`) }),
+                ...(tooltip != null && { tooltip: mapTooltip(tooltip) }),
+            }
+        },
+        ({ label, tooltip, explain, placeholder, hintHeader, hintDetail, divider, unit, options, thMap, tabs, [OPTION_SCOPE]: optScope, ...field }, prefix) => ({
+            ...field,
+            ...(label != null && { label: t(`$label.${prefix ? `${prefix}.${label}` : label}`) }),
+            ...(explain != null && { explain: t(`$explain.${explain}`) }),
+            ...(placeholder != null && { placeholder: t(`$placeholder.${placeholder}`) }),
+            ...(hintHeader != null && { hintHeader: t(`$hintHeader.${hintHeader}`) }),
+            ...(hintDetail != null && { hintDetail: t(`$hintDetail.${hintDetail}`) }),
+            ...(divider != null && { divider: t(`$divider.${divider}`) }),
+            ...(unit != null && { unit: t(`$unit.${unit}`) }),
+            ...(tooltip != null && { tooltip: mapTooltip(tooltip) }),
+            ...(options != null && { options: mapOptions(options, optScope || field.key) }),
+            ...(thMap != null && { thMap: mapRecord(thMap, "$label") }),
+            ...(tabs != null && { tabs: tabs.map(tab => ({ ...tab, label: t(`$tab.${tab.label}`) })) }),
         }),
     )
 }
 
-module.exports = {
-    schemas,
-    i18n,
+const compile = (dsl, i18nData = require("../global/locales/en.json")) => {
+    initDSL(dsl)
+    return Object.fromEntries(
+        Object.entries(RAW_SCHEMA_FNS).map(([plugin, fn]) => {
+            const raw = dsl.define(fn)
+            const translated = i18n(raw, key => i18nData[plugin]?.[key] ?? i18nData.settings?.[key] ?? key)
+            return [plugin, translated]
+        }),
+    )
 }
+
+module.exports = compile

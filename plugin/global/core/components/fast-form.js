@@ -3,7 +3,7 @@ const utils = require("../utils")
 const i18n = require("../i18n")
 
 class FastForm extends HTMLElement {
-    static style = '<link rel="stylesheet" href="./plugin/global/styles/plugin-fast-form.css" crossorigin="anonymous">'
+    static style = `<link rel="stylesheet" href="./plugin/global/styles/plugin-fast-form.css" crossorigin="anonymous">`
     static controls = {}
     static features = {}
     static layouts = {}
@@ -55,7 +55,7 @@ class FastForm extends HTMLElement {
         super()
         const root = this.attachShadow({ mode: "open" })
         root.adoptedStyleSheets = sharedSheets
-        root.innerHTML = this.constructor.style + '<div id="form"></div>'
+        root.innerHTML = this.constructor.style + `<div id="form"></div>`
 
         this.form = root.querySelector("#form")
         this.options = {}
@@ -520,7 +520,7 @@ class LifecycleHooks {
             Object.entries(defaultImpls).map(([hookName, impl]) => {
                 const strategy = strategies[hookName] || {}
                 return [hookName, { impl, ...strategy }]
-            })
+            }),
         )
         this._statics = new Map(
             [...this._definitions.keys()]
@@ -528,7 +528,7 @@ class LifecycleHooks {
                     const impls = staticSubscribers.map(sub => sub?.[hookName]).filter(fn => typeof fn === "function")
                     return [hookName, new Set(impls)]
                 })
-                .filter(([_, set]) => set.size > 0)
+                .filter(([_, set]) => set.size > 0),
         )
     }
 
@@ -714,7 +714,7 @@ const Layout_Default = {
                 return tips.map(toHTML).join("")
             },
         }
-    }
+    },
 }
 
 const Layout_Grid = {
@@ -739,9 +739,9 @@ const Layout_Grid = {
                 const colClass = `ff-col-${col}`
                 const combinedClass = `${extraClass} ${colClass}`.trim()
                 return base.renderFieldWrapper.call(this, field, controlHTML, combinedClass)
-            }
+            },
         }
-    }
+    },
 }
 
 FastForm.registerLayout("default", Layout_Default)
@@ -818,11 +818,11 @@ const Feature_EventDelegation = {
 
             return form
         }
-    }
+    },
 }
 
 const Feature_DefaultKeybindings = {
-    onRender: (form) => form.onEvent("keydown", ev => ev.stopPropagation(), true)
+    onRender: (form) => form.onEvent("keydown", ev => ev.stopPropagation(), true),
 }
 
 const Feature_CollapsibleBox = {
@@ -839,7 +839,7 @@ const Feature_CollapsibleBox = {
                 })
             }
         })
-    }
+    },
 }
 
 const Feature_InteractiveTooltip = {
@@ -884,7 +884,7 @@ const Feature_InteractiveTooltip = {
         }
         form.traverseBoxes(normalize)
         form.traverseFields(normalize)
-    }
+    },
 }
 
 const Feature_Highlight = {
@@ -943,7 +943,7 @@ const Feature_Highlight = {
                         return NodeFilter.FILTER_ACCEPT
                     }
                     return NodeFilter.FILTER_REJECT
-                }
+                },
             })
 
             const targetNodes = []
@@ -994,7 +994,7 @@ const Feature_Highlight = {
 
         registerApi("highlight", { highlight, clear })
         hooks.on("onRender", () => hl && highlight(hl))
-    }
+    },
 }
 
 /**
@@ -1015,7 +1015,7 @@ const Feature_Highlight = {
 const Feature_DSLEngine = (() => {
     const RESOLVE_SYM = Symbol("schema:resolve")
 
-    const Dep = new Proxy({
+    const When = new Proxy({
         or: (...args) => ({ $or: args }),
         and: (...args) => ({ $and: args }),
         follow: (key) => ({ $follow: key }),
@@ -1031,11 +1031,6 @@ const Feature_DSLEngine = (() => {
                 : (key, val) => ({ [key]: { [`$${prop}`]: val } })
         },
     })
-    const Tip = {
-        info: (text) => text,
-        custom: (icon, text) => ({ icon, text }),
-        action: (action, icon, text) => ({ action, icon, text }),
-    }
     const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
     const mergeDeps = (previousDep, nextDep) => {
         if (!previousDep) return nextDep
@@ -1051,7 +1046,7 @@ const Feature_DSLEngine = (() => {
                 combined.push(newItem)
             }
         }
-        if (combined.length === 0) return
+        if (combined.length === 0) return undefined
         if (combined.length === 1) return combined[0]
         return { $and: combined }
     }
@@ -1091,11 +1086,11 @@ const Feature_DSLEngine = (() => {
     }
 
     const PropResolvers = {
-        FIELD: {
+        INNER: {
             assign: (box, innerField, propKey, propVal) => innerField[propKey] = propVal,
             transfer: null,
         },
-        BOX: {
+        OUTER: {
             assign: (box, innerField, propKey, propVal) => box[propKey] = propVal,
             transfer: null,
         },
@@ -1107,29 +1102,55 @@ const Feature_DSLEngine = (() => {
                 }
             },
         },
-        TITLE_LABEL: {
-            assign: (box, innerField, propKey, propVal) => box.title = propVal,
+        MAP_KEYS: (outerKey, innerKey) => ({
+            assign: (box, innerField, propKey, propVal) => box[outerKey] = propVal,
             transfer: (box, innerField) => {
-                if (box.title != null) {
-                    innerField.label = box.title
+                if (box[outerKey] !== undefined) {
+                    innerField[innerKey] = box[outerKey]
                 }
             },
-        },
-        /** Sets the unit value and implicitly upgrades the field type from 'number' to 'unit'. This enables suffix rendering without requiring an explicit control change. */
-        UNIT_CONVERTER: {
-            assign: (box, innerField, propKey, propVal) => {
-                innerField[propKey] = propVal
-                if (innerField.type === "number") {
-                    innerField.type = "unit"
+        }),
+        FALLBACK_ON_TRANSFER: (defaultValue) => ({
+            assign: (box, innerField, propKey, propVal) => innerField[propKey] = propVal,
+            transfer: (box, innerField, propKey) => {
+                if (innerField[propKey] === undefined) {
+                    innerField[propKey] = defaultValue
                 }
+            },
+        }),
+        WITH_SIDE_EFFECT: (effectFn) => ({
+            assign: (box, innerField, propKey, ...args) => {
+                innerField[propKey] = args[0]
+                effectFn(box, innerField, propKey, ...args)
             },
             transfer: null,
-        },
+        }),
+        TOOLTIP: (strategy) => ({
+            assign: (box, innerField, propKey, payload) => {
+                const target = strategy === "INNER" ? innerField : box
+                let items = []
+                if (Array.isArray(payload)) {
+                    items = payload
+                } else if (typeof payload === "object" && payload !== null) {
+                    items = [payload]
+                } else if (payload != null && payload !== "") {
+                    items = [String(payload)]
+                }
+                target[propKey] = [].concat(target[propKey] ?? [], items)
+            },
+            transfer: strategy === "SHARED"
+                ? (box, innerField, propKey) => {
+                    if (box[propKey] !== undefined) {
+                        innerField[propKey] = box[propKey]
+                    }
+                }
+                : null,
+        }),
         DEPENDENCY: {
             assign: (box, innerField, propKey, ...deps) => {
                 const [keyOrDep, value] = deps
-                const newDep = (value != null) ? Dep.eq(keyOrDep, value)
-                    : (typeof keyOrDep === "string") ? Dep.true(keyOrDep) : keyOrDep
+                const newDep = (value != null) ? When.eq(keyOrDep, value)
+                    : (typeof keyOrDep === "string") ? When.true(keyOrDep) : keyOrDep
                 box.dependencies = mergeDeps(box.dependencies, newDep)
             },
             transfer: (box, innerField) => {
@@ -1164,16 +1185,27 @@ const Feature_DSLEngine = (() => {
             },
             transfer: null,
         },
+        MERGE_INNER: {
+            assign: (box, innerField, propKey, keyOrObj, value) => {
+                if (!innerField[propKey]) innerField[propKey] = {}
+                if (typeof keyOrObj === "string") {
+                    innerField[propKey][keyOrObj] = value  // .SubFormOptions({ layout: "grid", boxDependencyUnmetAction: "readonly" })
+                } else if (keyOrObj && typeof keyOrObj === "object") {
+                    Object.assign(innerField[propKey], keyOrObj)  // .SubFormOptions("boxDependencyUnmetAction", "readonly")
+                }
+            },
+            transfer: null,
+        },
     }
+
     const BaseSpecs = {
         FIELD: {
-            key: PropResolvers.FIELD,
-            type: PropResolvers.FIELD,
-            label: PropResolvers.TITLE_LABEL,
-            tooltip: PropResolvers.SHARED,
-            explain: PropResolvers.SHARED,
+            key: PropResolvers.INNER,
+            type: PropResolvers.INNER,
+            label: PropResolvers.MAP_KEYS("title", "label"),
+            tooltip: PropResolvers.TOOLTIP("SHARED"),
+            explain: PropResolvers.INNER,
             hidden: PropResolvers.SHARED,
-            disabled: PropResolvers.SHARED,
             col: PropResolvers.SHARED,
             className: PropResolvers.SHARED,
             dependencyUnmetAction: PropResolvers.SHARED,
@@ -1181,12 +1213,12 @@ const Feature_DSLEngine = (() => {
             showIf: PropResolvers.DEPENDENCY,  // Alias for `dependencies`
         },
         BOX: {
-            id: PropResolvers.BOX,
-            title: PropResolvers.BOX,
-            tooltip: PropResolvers.BOX,
-            col: PropResolvers.BOX,
-            className: PropResolvers.BOX,
-            dependencyUnmetAction: PropResolvers.BOX,
+            id: PropResolvers.OUTER,
+            title: PropResolvers.OUTER,
+            tooltip: PropResolvers.TOOLTIP("OUTER"),
+            col: PropResolvers.OUTER,
+            className: PropResolvers.OUTER,
+            dependencyUnmetAction: PropResolvers.OUTER,
             fields: PropResolvers.FIELDS,
             children: PropResolvers.FIELDS,  // Alias for `fields`
             dependencies: PropResolvers.DEPENDENCY,
@@ -1211,7 +1243,7 @@ const Feature_DSLEngine = (() => {
                     const box = { ...this }
                     box.fields = [{ ...this.fields[0] }]
                     return box
-                }
+                },
             }),
         },
         BOX: {
@@ -1225,7 +1257,7 @@ const Feature_DSLEngine = (() => {
                 },
                 asBox() {
                     return { ...this }
-                }
+                },
             }),
         },
         PRESET: {
@@ -1258,6 +1290,10 @@ const Feature_DSLEngine = (() => {
                     scopedProto.any[name] = BuilderFactory.PRESET.createSetter(handler)
                 }
                 const presetFor = (targetType, name, handler) => {
+                    if (Array.isArray(targetType)) {
+                        targetType.forEach(type => presetFor(type, name, handler))
+                        return
+                    }
                     const targetProto = targetType === "box" ? scopedProto.box : scopedProto.fields[targetType]
                     if (!targetProto) {
                         throw new Error(`[DSLEngine] Target type "${targetType}" does not exist.`)
@@ -1283,16 +1319,15 @@ const Feature_DSLEngine = (() => {
                         propResolver.assign(box, innerField, prop, value)
                     }
                 }
-                const defineField = (type, specs = {}, defaultProps = {}) => {
+                const defineField = (name, specs = {}, defaultProps = {}) => {
                     const finalSpecs = { ...BaseSpecs.FIELD, ...specs }
                     const proto = buildPrototype(finalSpecs, BuilderFactory.FIELD)
-                    scopedProto.fields[type] = proto
-                    return (key, overrideProps = {}) => {
-                        const finalProps = { ...defaultProps, ...overrideProps }
+                    scopedProto.fields[name] = proto
+                    return (key) => {
                         const box = Object.create(proto)
-                        const innerField = { type, key }
+                        const innerField = { type: defaultProps.type || name, key }
                         box.fields = [innerField]
-                        assignProps(box, innerField, finalProps, finalSpecs)
+                        assignProps(box, innerField, defaultProps, finalSpecs)
                         return box
                     }
                 }
@@ -1303,21 +1338,21 @@ const Feature_DSLEngine = (() => {
                     return (...args) => {
                         const box = Object.create(proto)
                         assignProps(box, null, defaultProps, finalSpecs)
-                        let argIdx = 0
+                        let idx = 0
                         if (args.length > 0 && typeof args[0] === "string") {
                             box.title = args[0]
-                            argIdx++
+                            idx++
                         }
-                        appendFields(box, args.slice(argIdx))
+                        appendFields(box, args.slice(idx))
                         return box
                     }
                 }
                 const createDefine = (context) => {
                     return (input) => normalizeBoxes(typeof input === "function" ? input(context) : input)
                 }
-                return { Dep, Tip, PropResolvers, createDefine, defineField, defineBox, preset, presetFor }
+                return { When, PropResolvers, createDefine, defineField, defineBox, preset, presetFor }
             }
-            form.dslEngine.statics = { resolveFields, resolveBoxes, normalizeBoxes, appendFields, RESOLVE_SYM, Dep, Tip, PropResolvers, BaseSpecs, BuilderFactory }
+            form.dslEngine.statics = { resolveFields, resolveBoxes, normalizeBoxes, appendFields, RESOLVE_SYM, When, PropResolvers, BaseSpecs, BuilderFactory }
         },
     }
 })()
@@ -1329,45 +1364,63 @@ const Feature_StandardDSL = {
             return
         }
         const engine = form.dslEngine()
-        const { createDefine, defineBox, defineField, Tip, Dep, PropResolvers } = engine
-        const { FIELD: F, SCHEMA, UNIT_CONVERTER, TABS, TAB_APPEND } = PropResolvers
-        const BASE = { placeholder: F, readonly: F, disabled: F, className: F, isBlockLayout: F }
-        const NUM = { ...BASE, min: F, max: F, step: F, isInteger: F }
-        const UNIT = { ...NUM, unit: UNIT_CONVERTER }
-        const OPT = { ...BASE, options: F, disabledOptions: F }
-        const LIST = { minItems: F, maxItems: F }
+        const { createDefine, defineBox, defineField, When, PropResolvers } = engine
+        const { INNER, SCHEMA, TABS, TAB_APPEND, MERGE_INNER, FALLBACK_ON_TRANSFER, WITH_SIDE_EFFECT, TOOLTIP } = PropResolvers
+
+        const convertToUnit = WITH_SIDE_EFFECT((box, innerField) => {
+            if (innerField.type === "number") innerField.type = "unit"
+        })
+
+        const PLACEHOLDER = { placeholder: INNER }
+        const STATE = { disabled: INNER, readonly: INNER }
+        const NUMBER = { min: INNER, max: INNER, step: INNER, isInteger: INNER, unit: convertToUnit }
+        const OPTIONS = { options: INNER, disabledOptions: INNER }
+        const LIMITS = { minItems: INNER, maxItems: INNER }
+
+        const INLINE = { tooltip: TOOLTIP("INNER"), isBlockLayout: INNER, label: INNER }
+        const BLOCK = { tooltip: TOOLTIP("SHARED"), isBlockLayout: FALLBACK_ON_TRANSFER(false) }
+
+        const INLINE_INPUT = { ...INLINE, ...STATE }
+        const INLINE_TEXT = { ...INLINE_INPUT, ...PLACEHOLDER }
+        const INLINE_NUM = { ...INLINE_INPUT, ...NUMBER }
+        const INLINE_OPTIONS = { ...INLINE, ...OPTIONS }
+
+        const BLOCK_INPUT = { ...BLOCK, ...STATE }
+        const BLOCK_TEXT = { ...BLOCK_INPUT, ...PLACEHOLDER }
+        const BLOCK_OPTIONS = { ...BLOCK, ...OPTIONS }
+
         const Controls = {
-            Switch: defineField("switch", BASE),
-            Text: defineField("text", BASE),
-            Password: defineField("password", BASE),
-            Color: defineField("color", BASE),
-            Number: defineField("number", UNIT),
-            // Unit: defineField("unit", UNIT),  // Deprecated: Use `Controls.Number().Unit()` for a fluent API experience.
-            Integer: defineField("number", UNIT, { isInteger: true }),
-            Float: defineField("number", UNIT, { isInteger: false }),
-            Icon: defineField("icon", BASE),
-            Range: defineField("range", NUM),
-            Action: defineField("action", { ...BASE, actionType: F, activeClass: F }),
-            Static: defineField("static", { ...BASE, content: F, unsafe: F }),
-            Custom: defineField("custom", { ...BASE, content: F, unsafe: F }),
-            Hint: defineField("hint", { ...BASE, hintHeader: F, hintDetail: F, unsafe: F }),
-            Divider: defineField("divider", { ...BASE, divider: F, position: F, dashed: F }),
-            Hotkey: defineField("hotkey", BASE),
-            Textarea: defineField("textarea", { ...BASE, rows: F, cols: F, noResize: F }),
-            Code: defineField("code", { ...BASE, tabSize: F, lineNumbers: F }),
-            Object: defineField("object", { ...BASE, rows: F, noResize: F, format: F }),
-            Array: defineField("array", { ...BASE, ...LIST, allowDuplicates: F, dataType: F }),
-            Select: defineField("select", { ...OPT, ...LIST, labelJoiner: F }),
-            Radio: defineField("radio", { ...OPT, columns: F }),
-            Checkbox: defineField("checkbox", { ...OPT, ...LIST, columns: F }),
-            Transfer: defineField("transfer", { ...OPT, ...LIST, titles: F, defaultHeight: F }),
-            Dict: defineField("dict", { ...BASE, keyPlaceholder: F, valuePlaceholder: F, allowAddItem: F }),
-            Palette: defineField("palette", { ...BASE, defaultColor: F, dimensions: F, allowJagged: F }),
-            Table: defineField("table", { ...BASE, thMap: F, nestedBoxes: SCHEMA, defaultValues: F }),
-            Composite: defineField("composite", { ...BASE, subSchema: SCHEMA, defaultValues: F }),
-            Tabs: defineField("tabs", { ...BASE, tabs: TABS, tab: TAB_APPEND, tabStyle: F, tabPosition: F, defaultSelectedTab: F, defaultTabLabel: F }),
+            Switch: defineField("switch", INLINE_INPUT),
+            Text: defineField("text", INLINE_TEXT),
+            Password: defineField("password", INLINE_TEXT),
+            Color: defineField("color", INLINE_TEXT),
+            Icon: defineField("icon", INLINE_TEXT),
+            Hotkey: defineField("hotkey", { ...INLINE_INPUT, idlePlaceholder: INNER, listenPlaceholder: INNER }),
+            Range: defineField("range", INLINE_NUM),
+            Number: defineField("number", { ...INLINE_NUM, ...PLACEHOLDER }),
+            Integer: defineField("integer", { ...INLINE_NUM, ...PLACEHOLDER }, { type: "number", isInteger: true }),
+            Float: defineField("float", { ...INLINE_NUM, ...PLACEHOLDER }, { type: "number", isInteger: false }),
+            Action: defineField("action", { ...INLINE, actionType: INNER, activeClass: INNER }),
+            Static: defineField("static", { ...INLINE, content: INNER }),
+            Composite: defineField("composite", { ...INLINE_INPUT, subSchema: SCHEMA, defaultValues: INNER }),
+            Select: defineField("select", { ...INLINE_OPTIONS, ...LIMITS, labelJoiner: INNER }),
+            Segment: defineField("segment", { ...INLINE_OPTIONS, ...LIMITS }),
+            Radio: defineField("radio", { ...BLOCK_OPTIONS, columns: INNER }),
+            Checkbox: defineField("checkbox", { ...BLOCK_OPTIONS, ...LIMITS, columns: INNER }),
+            Transfer: defineField("transfer", { ...BLOCK_OPTIONS, ...LIMITS, titles: INNER, defaultHeight: INNER }),
+            Textarea: defineField("textarea", { ...BLOCK_TEXT, rows: INNER, cols: INNER, noResize: INNER }),
+            Code: defineField("code", { ...BLOCK_TEXT, tabSize: INNER, lineNumbers: INNER }),
+            Object: defineField("object", { ...BLOCK_TEXT, rows: INNER, noResize: INNER, format: INNER }),
+            Custom: defineField("custom", { ...BLOCK, content: INNER, unsafe: INNER }),
+            Hint: defineField("hint", { ...BLOCK, hintHeader: INNER, hintDetail: INNER, unsafe: INNER }),
+            Divider: defineField("divider", { ...BLOCK, divider: INNER, position: INNER, dashed: INNER }),
+            Array: defineField("array", { ...BLOCK, allowDuplicates: INNER, dataType: INNER }),
+            Dict: defineField("dict", { ...BLOCK, keyPlaceholder: INNER, valuePlaceholder: INNER, allowAddItem: INNER }),
+            Palette: defineField("palette", { ...BLOCK, defaultColor: INNER, dimensions: INNER, allowJagged: INNER }),
+            Table: defineField("table", { ...BLOCK, thMap: INNER, nestedBoxes: SCHEMA, defaultValues: INNER, subFormOptions: MERGE_INNER }),
+            Tabs: defineField("tabs", { ...BLOCK, tabs: TABS, tab: TAB_APPEND, tabStyle: INNER, tabPosition: INNER, defaultSelectedTab: INNER, defaultTabLabel: INNER }),
         }
-        const dsl = { Group: defineBox(), Controls, Tip, Dep, Extend: engine }
+        const dsl = { Group: defineBox(), Controls, When, Extend: engine }
         dsl.define = createDefine(dsl)
         form.dsl = dsl
     },
@@ -1456,7 +1509,7 @@ const Feature_Watchers = (() => {
                         const actual = getter(ctx)
                         return ctx.compare(actual, expected)
                     })
-                }
+                },
             },
         }
 
@@ -1473,7 +1526,7 @@ const Feature_Watchers = (() => {
             $deepEqual: { evaluate: (actual, expected) => utils.deepEqual(actual, expected) },
             $startsWith: { evaluate: (actual, expected) => typeof actual === "string" && typeof expected === "string" && actual.startsWith(expected) },
             $endsWith: { evaluate: (actual, expected) => typeof actual === "string" && typeof expected === "string" && actual.endsWith(expected) },
-            $typeof: { evaluate: (actual, expected) => (expected === "object") ? (typeof actual === "object" && actual != null) : (typeof actual === expected) }
+            $typeof: { evaluate: (actual, expected) => (expected === "object") ? (typeof actual === "object" && actual != null) : (typeof actual === expected) },
         }
 
         const effectHandlers = {
@@ -1487,7 +1540,7 @@ const Feature_Watchers = (() => {
                             ctx.setValue(key, resolvedValue)
                         }
                     })
-                }
+                },
             },
             $updateUI: {
                 collectAffects: () => [],
@@ -1498,7 +1551,7 @@ const Feature_Watchers = (() => {
                     } else if (isMet) {
                         DependencyAnalyzer.applyUiEffects(declaration, ctx)
                     }
-                }
+                },
             },
         }
 
@@ -2025,7 +2078,7 @@ const Feature_Validation = {
                 entry.$self.push(...normalized.$self)
                 entry.$each.push(...normalized.$each)
             },
-            getRules: (key) => state.compiledRules.get(key)
+            getRules: (key) => state.compiledRules.get(key),
         })
         hooks.on("onValidate", (changeContext) => {
             const { key, value, type } = changeContext
@@ -2092,7 +2145,7 @@ const Feature_Validation = {
                     console.warn(`FastForm Warning: Overwriting validator for '${name}'.`)
                 }
                 Feature_Validation._validators[name] = definition
-            }
+            },
         }
     },
     _validators: {
@@ -2149,7 +2202,7 @@ const Feature_Validation = {
             if (value == null) return true
             return (Array.isArray(value) || typeof value === "object") ? true : i18n.t("global", "error.pattern")
         },
-    }
+    },
 }
 
 function normalizeWatcherOptions(rule) {
@@ -2226,7 +2279,7 @@ const Feature_FieldDependencies = {
             },
         }
         FastFormClass.registerConditionEvaluator("$follow", Condition_Follow)
-    }
+    },
 }
 
 const Feature_BoxDependencies = {
@@ -2301,7 +2354,7 @@ const Feature_BoxDependencies = {
                 isBoxDependency: true, // Special property to identify it as an auto-generated watcher
             })
         })
-    }
+    },
 }
 
 const Feature_Cascades = {
@@ -2333,7 +2386,7 @@ const Feature_Cascades = {
                 isCascade: true, // Special property to identify it as a cascade
             })
         })
-    }
+    },
 }
 
 FastForm.registerFeature("eventDelegation", Feature_EventDelegation)
@@ -2457,7 +2510,7 @@ const Effect_Map = {
         if (!utils.deepEqual(currentTargetValue, finalValue)) {
             context.setValue(value.to, finalValue)
         }
-    }
+    },
 }
 
 FastForm.registerConditionEvaluator("$compareFields", Condition_CompareFields)
@@ -2650,24 +2703,60 @@ const Control_Password = {
 const Control_Color = {
     create: ({ field }) => {
         const { key, placeholder } = getCommonHTMLAttrs(field)
-        const input = `<input class="color-input" type="color" ${key} ${placeholder}>`
-        return `<div class="color-wrap"><div class="color-display"></div>${input}</div>`
+        return `
+            <div class="color-wrap" ${key}>
+                <label class="color-swatch-trigger"><div class="color-swatch-inner"></div><input class="color-picker-input" type="color" tabindex="-1"></label>
+                <input class="color-text-input" type="text" ${placeholder} spellcheck="false" maxlength="7">
+            </div>`
     },
     update: ({ element, value, field }) => {
-        const input = element.querySelector(".color-input")
-        const display = element.querySelector(".color-display")
-        if (input && display) {
-            value = value || "#FFFFFF"
-            updateInputState(input, field, value)
-            display.textContent = value.toUpperCase()
+        const wrap = element.querySelector(".color-wrap")
+        const text = element.querySelector(".color-text-input")
+        const picker = element.querySelector(".color-picker-input")
+        const validHex = Control_Color._normalize(value) || "#FFFFFF"
+        Control_Color._syncUI(wrap, validHex)
+        if (text) {
+            text.disabled = !!field.disabled
+            text.readOnly = !!field.readonly
+        }
+        if (picker) {
+            picker.disabled = !!field.disabled
         }
     },
     bindEvents: ({ form }) => {
-        form.onEvent("input", ".color-input", function () {
-            this.previousElementSibling.textContent = this.value.toUpperCase()
-        }).onEvent("change", ".color-input", function () {
-            form.validateAndCommit(this.dataset.key, this.value)
+        form.onEvent("input", ".color-picker-input", function () {
+            Control_Color._syncUI(this.closest(".color-wrap"), this.value)
+        }).onEvent("input", ".color-text-input", function () {
+            const validHex = Control_Color._normalize(this.value)
+            if (validHex) Control_Color._syncUI(this.closest(".color-wrap"), validHex, false)
+        }).onEvent("change", ".color-picker-input", function () {
+            form.validateAndCommit(this.closest(".color-wrap").dataset.key, this.value)
+        }).onEvent("change", ".color-text-input", function () {
+            const wrap = this.closest(".color-wrap")
+            const key = wrap.dataset.key
+            const validHex = Control_Color._normalize(this.value)
+            if (validHex) {
+                form.validateAndCommit(key, validHex)
+            } else {
+                Control_Color._syncUI(wrap, form.getData(key) || "#FFFFFF")
+            }
         })
+    },
+    _normalize: (val) => {
+        if (typeof val !== "string") return null
+        const hex = val.trim().replace(/^#/, "").toUpperCase()
+        if (/^[0-9A-F]{3}$/.test(hex)) return "#" + Array.from(hex).map(c => c + c).join("")
+        if (/^[0-9A-F]{6}$/.test(hex)) return "#" + hex
+        return null
+    },
+    _syncUI: (wrap, hex, syncText = true) => {
+        if (!wrap || !hex) return
+        const swatch = wrap.querySelector(".color-swatch-inner")
+        const picker = wrap.querySelector(".color-picker-input")
+        const text = wrap.querySelector(".color-text-input")
+        if (swatch) swatch.style.backgroundColor = hex
+        if (picker && picker.value !== hex) picker.value = hex
+        if (syncText && text && text.value !== hex) text.value = hex
     },
 }
 
@@ -2722,7 +2811,7 @@ const Control_Icon = {
         const { key } = getCommonHTMLAttrs(field)
         const placeholderText = field.placeholder || controlOptions.placeholder
         const input = `<input class="icon-input" type="text" ${key} placeholder="${placeholderText}">`
-        const preview = '<div class="icon-preview"><i class="icon-display"></i></div>'
+        const preview = `<div class="icon-preview"><i class="icon-display"></i></div>`
         return `<div class="icon-wrap">${input}${preview}</div>`
     },
     update: ({ element, value, field }) => {
@@ -2749,30 +2838,43 @@ const Control_Range = {
     setup: registerNumericalDefaultRules,
     create: ({ field }) => {
         const { key } = getCommonHTMLAttrs(field)
-        return `<div class="range-wrap">
-                    <input class="range-input" type="range" ${key} ${getNumericalHTMLAttr(field)}>
-                    <div class="range-value"></div>
+        const unitHtml = field.unit ? `<span class="range-unit">${utils.escape(field.unit)}</span>` : ""
+        return `<div class="range-wrap" ${key}>
+                    <input class="range-input" type="range" ${getNumericalHTMLAttr(field)}>
+                    <div class="range-badge"><span class="range-value"></span>${unitHtml}</div>
                 </div>`
     },
-    update: ({ element, value = field.min, field }) => {
-        const resolvedValue = value != null ? value : 0
+    update: ({ element, value, field }) => {
+        const wrap = element.querySelector(".range-wrap")
         const input = element.querySelector(".range-input")
-        const valueDisplay = element.querySelector(".range-value")
-        if (input && valueDisplay) {
-            updateInputState(input, field, resolvedValue)
+        const val = value != null ? value : (field.min ?? 0)
+        if (input && wrap) {
+            updateInputState(input, field, val)
             updateInputNumericalAttr(input, field)
-            valueDisplay.textContent = Control_Range._toFixed2(resolvedValue)
+            Control_Range._syncUI(wrap, val, field.min, field.max)
         }
     },
     bindEvents: ({ form }) => {
         form.onEvent("input", ".range-input", function () {
-            this.nextElementSibling.textContent = Control_Range._toFixed2(Number(this.value))
+            const wrap = this.closest(".range-wrap")
+            const field = form.getField(wrap.dataset.key)
+            Control_Range._syncUI(wrap, this.value, field.min, field.max)
         }).onEvent("change", ".range-input", function () {
-            form.validateAndCommit(this.dataset.key, Number(this.value))
+            form.validateAndCommit(this.closest(".range-wrap").dataset.key, Number(this.value))
         })
     },
-    _toFixed2: (num) => {
-        return Number.isInteger(num) ? num : num.toFixed(2)
+    _syncUI: (wrap, value, min = 0, max = 100) => {
+        if (!wrap) return
+        const input = wrap.querySelector(".range-input")
+        const badge = wrap.querySelector(".range-value")
+        const num = Number(value)
+        if (badge) {
+            badge.textContent = Number.isInteger(num) ? String(num) : String(num.toFixed(2))
+        }
+        if (input) {
+            const percent = max > min ? ((num - min) / (max - min)) * 100 : 0
+            input.style.setProperty("--progress", `${Math.max(0, Math.min(100, percent))}%`)
+        }
     },
 }
 
@@ -2788,9 +2890,9 @@ const Control_Action = {
         }
     },
     bindEvents: ({ form }) => {
-        form.onEvent("mousedown", '.control[data-type="action"]', function (ev) {
+        form.onEvent("mousedown", `.control[data-type="action"]`, function (ev) {
             Control_Action._ripple(this, ev)
-        }).onEvent("click", '.control[data-type="action"]', function () {
+        }).onEvent("click", `.control[data-type="action"]`, function () {
             Control_Action._doAction(this, form)
         })
     },
@@ -2895,7 +2997,7 @@ const Control_Divider = {
     update: ({ element, field, controlOptions }) => {
         const wrap = element.querySelector(".divider-wrap")
         if (wrap) {
-            const line = '<div class="divider-line"></div>'
+            const line = `<div class="divider-line"></div>`
             wrap.classList.add(controlOptions.position, controlOptions.dashed ? "dashed" : undefined)
             wrap.innerHTML = field.divider ? `${line}<div class="divider-text">${utils.escape(field.divider)}</div>${line}` : line
         }
@@ -2904,47 +3006,56 @@ const Control_Divider = {
 
 const Control_Hotkey = {
     create: ({ field }) => {
-        const { key, placeholder } = getCommonHTMLAttrs(field, true)
-        return `<div class="hotkey-wrap">
-                    <input type="text" class="hotkey-input" ${key} ${placeholder}>
-                      <div class="hotkey-btn">
-                        <div class="hotkey-reset plugin-common-close"></div>
-                      </div>
-                </div>`
+        const { key } = getCommonHTMLAttrs(field)
+        const idle = utils.escape(field.idlePlaceholder || "Click to record...")
+        const listen = utils.escape(field.listenPlaceholder || "Listening...")
+        return `
+            <div class="hotkey-wrap" data-value="" ${key}>
+                <div class="hotkey-recorder" tabindex="0" data-placeholder-idle="${idle}" data-placeholder-listen="${listen}"><div class="hotkey-display"></div></div>
+                <div class="hotkey-clear plugin-common-close"></div>
+            </div>`
     },
     update: ({ element, value, field }) => {
-        const input = element.querySelector(".hotkey-input")
-        if (input) {
-            updateInputState(input, field, utils.hotkeyHub.capitalize(value || ""))
-        }
+        const wrap = element.querySelector(".hotkey-wrap")
+        Control_Hotkey._display(wrap, value || "")
+        wrap.classList.toggle("plugin-common-readonly", !!(field.disabled || field.readonly))
     },
     bindEvents: ({ form }) => {
-        const ignoreKeys = ["control", "alt", "shift", "meta"]
-        const updateHotkey = utils.debounce(hk => form.validateAndCommit(hk.dataset.key, hk.value), 500)
-
-        form.onEvent("click", ".hotkey-reset", function () {
-            const input = this.closest(".hotkey-wrap").querySelector("input")
-            const ok = form.validateAndCommit(input.dataset.key, "")
-            if (ok) {
-                utils.hotkeyHub.unregister(input.value)
-                input.value = ""
-            }
-        }).onEvent("keydown", ".hotkey-input", function (ev) {
-            if (ev.key === undefined) return
-            if (ev.key !== "Process") {
-                const key = ev.key.toLowerCase()
-                const keyCombination = [
-                    utils.metaKeyPressed(ev) ? "ctrl" : undefined,
-                    utils.shiftKeyPressed(ev) ? "shift" : undefined,
-                    utils.altKeyPressed(ev) ? "alt" : undefined,
-                    ignoreKeys.includes(key) ? undefined : key,
-                ]
-                this.value = utils.hotkeyHub.capitalize(keyCombination.filter(Boolean).join("+"))
-                updateHotkey(this)
-            }
-            ev.stopPropagation()
-            ev.preventDefault()
+        form.onEvent("click", ".hotkey-clear", function () {
+            form.reactiveCommit(this.closest(".hotkey-wrap").dataset.key, "")
+            return false
+        }).onEvent("focusin", ".hotkey-recorder", function () {
+            utils.hotkeyHub.pause()
+        }).onEvent("focusout", ".hotkey-recorder", function () {
+            utils.hotkeyHub.resume()
+            const { key, value } = this.closest(".hotkey-wrap").dataset
+            form.reactiveCommit(key, value)
+        }).onEvent("keydown", ".hotkey-recorder", function (ev) {
+            if (!ev.key || ev.key === "Process") return false
+            const hotkey = Control_Hotkey._parse(ev)
+            if (hotkey) Control_Hotkey._display(this.closest(".hotkey-wrap"), hotkey)
+            return false
         }, true)
+    },
+    _parse: (ev) => {
+        const ignoreKeys = ["control", "alt", "shift", "meta"]
+        const key = ev.key.toLowerCase()
+        const combo = [
+            (ev.ctrlKey || ev.metaKey) ? "ctrl" : undefined,
+            ev.shiftKey ? "shift" : undefined,
+            ev.altKey ? "alt" : undefined,
+            ignoreKeys.includes(key) ? undefined : key,
+        ]
+        return combo.filter(Boolean).join("+")
+    },
+    _display: (wrap, hotkey) => {
+        wrap.dataset.value = hotkey
+        wrap.querySelector(".hotkey-display").innerHTML = hotkey
+            .split("+")
+            .map(key => key.trim())
+            .filter(Boolean)
+            .map(key => `<kbd class="hotkey-kbd">${key.charAt(0).toUpperCase() + key.slice(1)}</kbd>`)
+            .join("+")
     },
 }
 
@@ -2972,9 +3083,8 @@ const Control_Textarea = {
     bindEvents: ({ form }) => {
         form.onEvent("keydown", ".textarea", function (ev) {
             if (utils.metaKeyPressed(ev) && ev.key === "Enter") {
-                ev.stopPropagation()
-                ev.preventDefault()
                 form.validateAndCommit(this.dataset.key, this.value)
+                return false
             }
         }, true).onEvent("change", ".textarea", function () {
             form.validateAndCommit(this.dataset.key, this.value)
@@ -3036,8 +3146,6 @@ const Control_CodeEditor = {
                 syncState(this)
                 form.validateAndCommit(key, this.value)
             } else if (ev.key === "Enter") {
-                ev.stopPropagation()
-                ev.preventDefault()
                 const cursor = this.selectionStart
                 const currentLineStart = this.value.lastIndexOf("\n", cursor - 1) + 1
                 const currentLine = this.value.substring(currentLineStart, cursor)
@@ -3048,6 +3156,7 @@ const Control_CodeEditor = {
                 this.blur()
                 this.focus()
                 form.validateAndCommit(key, this.value)
+                return false
             }
         }, true)
     },
@@ -3207,13 +3316,11 @@ const Control_Array = {
             Control_Array._moveCursor(valueEl)
         }).onEvent("keydown", selector, function (ev) {
             if (ev.key === "Enter") {
-                ev.preventDefault()
-                ev.stopPropagation()
                 this.blur()
+                return false
             } else if (ev.key === "Escape") {
-                ev.preventDefault()
-                ev.stopPropagation()
                 form._updateControl(this.closest(".array").dataset.key)
+                return false
             }
         }, true).onEvent("focusout", selector, function () {
             Control_Array._commitChange(this, form)
@@ -3283,7 +3390,7 @@ const Control_Select = {
     create: ({ field }) => {
         const toOptionItem = ([optionKey, optionShowName]) => {
             const readonlyCls = field.disabledOptions?.includes(optionKey) ? "plugin-common-readonly" : ""
-            const cls = `option-item${readonlyCls ? ' ' + readonlyCls : ''}`
+            const cls = `option-item${readonlyCls ? " " + readonlyCls : ""}`
             return `<div class="${cls}" data-option-key="${optionKey}">${utils.escape(optionShowName)}</div>`
         }
         const selectOptions = Object.entries(field.options).map(toOptionItem).join("")
@@ -3318,9 +3425,7 @@ const Control_Select = {
                 utils.hide(shownOptionBox)
             }
             state.set(SHOWN_OPTION_BOX, null)
-        }).onEvent("click", ".select-wrap", function (ev) {
-            ev.stopPropagation()
-            ev.preventDefault()
+        }).onEvent("click", ".select-wrap", function () {
             const optionBox = this.nextElementSibling
             const boxes = [...form.getFormEl().querySelectorAll(".option-box")]
             boxes.filter(box => box !== optionBox).forEach(utils.hide)
@@ -3330,6 +3435,7 @@ const Control_Select = {
                 optionBox.scrollIntoView({ block: "nearest" })
             }
             state.set(SHOWN_OPTION_BOX, isShown ? optionBox : null)
+            return false
         }, true).onEvent("click", ".option-item", function () {
             const optionEl = this
             const toggleOptionKey = optionEl.dataset.optionKey
@@ -3351,6 +3457,52 @@ const Control_Select = {
     },
     _joinSelected: (labels, labelJoiner) => {
         return labels.length ? labels.join(labelJoiner) : i18n.t("global", "empty")
+    },
+}
+
+const Control_Segment = {
+    setup: (context) => {
+        normalizeOptionsAttr(context.field)
+        registerItemLengthLimitRule(context)
+    },
+    create: ({ field }) => {
+        const disabledOpts = Array.isArray(field.disabledOptions) ? field.disabledOptions.map(String) : []
+        const items = Object.entries(field.options || {}).map(([val, label]) => {
+            const isDisabled = disabledOpts.includes(String(val))
+            const readonlyCls = isDisabled ? "plugin-common-readonly" : ""
+            const cls = `segment-item ${readonlyCls}`.trim()
+            return `<button type="button" class="${cls}" data-value="${utils.escape(String(val))}">${utils.escape(label)}</button>`
+        }).join("")
+        const { key } = getCommonHTMLAttrs(field)
+        return `<div class="segment" ${key}>${items}</div>`
+    },
+    update: ({ element, value }) => {
+        const segment = element.querySelector(".segment")
+        if (!segment) return
+        const isMulti = Array.isArray(value)
+        const selectedKeys = isMulti ? (value || []).map(String) : (value != null ? [String(value)] : [])
+        segment.querySelectorAll(".segment-item").forEach(item => {
+            item.classList.toggle("active", selectedKeys.includes(item.dataset.value))
+        })
+    },
+    bindEvents: ({ form }) => {
+        form.onEvent("click", ".segment-item", function () {
+            if (this.classList.contains("plugin-common-readonly")) return
+            const segment = this.closest(".segment")
+            const key = segment.dataset.key
+            const clickedValue = this.dataset.value
+            const currentValue = form.getData(key)
+            let nextValue = clickedValue
+            if (Array.isArray(currentValue)) {
+                const idx = currentValue.map(String).indexOf(clickedValue)
+                nextValue = idx > -1
+                    ? [...currentValue.slice(0, idx), ...currentValue.slice(idx + 1)]
+                    : [...currentValue, clickedValue]
+            } else {
+                if (String(currentValue) === clickedValue) return
+            }
+            form.reactiveCommit(key, nextValue)
+        })
     },
 }
 
@@ -3532,7 +3684,7 @@ const Control_Transfer = {
             const destRect = activeDraggable.getBoundingClientRect()
             const animation = dragGhost.animate([
                 { transform: `translate3d(${ghostX}px, ${ghostY}px, 0)` },
-                { transform: `translate3d(${destRect.left}px, ${destRect.top}px, 0)` }
+                { transform: `translate3d(${destRect.left}px, ${destRect.top}px, 0)` },
             ], { duration: 200, easing: "cubic-bezier(0.2, 0, 0, 1)" })
 
             animation.onfinish = () => {
@@ -3585,10 +3737,7 @@ const Control_Transfer = {
             }
         })
 
-        form.onEvent("drop", ".transfer-container", (ev) => {
-            ev.preventDefault()
-            ev.stopPropagation()
-        })
+        form.onEvent("drop", ".transfer-container", () => false)
 
         form.onEvent("mousedown", ".transfer-resize-handle", function (ev) {
             ev.preventDefault()
@@ -3638,7 +3787,7 @@ const Control_Transfer = {
             boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
             border: "1px solid var(--ff-primary, #007AFF)",
             width: `${sourceEl.offsetWidth}px`,
-            height: `${sourceEl.offsetHeight}px`
+            height: `${sourceEl.offsetHeight}px`,
         })
         return ghost
     },
@@ -3680,7 +3829,7 @@ const Control_Transfer = {
             if (dx !== 0 || dy !== 0) {
                 item.animate([
                     { transform: `translate(${dx}px, ${dy}px)` },
-                    { transform: "translate(0, 0)" }
+                    { transform: "translate(0, 0)" },
                 ], { duration: 200, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "both" })
             }
         })
@@ -3698,7 +3847,7 @@ const Control_Transfer = {
         for (let i = 0; i < source.children.length; i++) {
             if (target.children[i]) Control_Transfer._deepCopyStyles(source.children[i], target.children[i])
         }
-    }
+    },
 }
 
 const Control_Dict = {
@@ -3710,7 +3859,7 @@ const Control_Dict = {
     setup: ({ field }) => defaultBlockLayout(field),
     create: ({ field, controlOptions }) => {
         const { key } = getCommonHTMLAttrs(field)
-        const list = '<div class="dict-list"></div>'
+        const list = `<div class="dict-list"></div>`
         const add = controlOptions.allowAddItem ? `<div class="dict-btn-add">+ ${i18n.t("global", "add")}</div>` : ""
         return `<div class="dict-wrap" ${key}>${list}${add}</div>`
     },
@@ -3759,7 +3908,7 @@ const Control_Dict = {
                 const wrap = ev.target.closest(".dict-wrap")
                 row.remove()
                 Control_Dict._collectAndCommit(wrap, form)
-            }
+            },
         })).onEvent("click", ".dict-btn-add", function () {
             const wrap = this.parentElement
             const listEl = wrap.querySelector(".dict-list")
@@ -3841,7 +3990,7 @@ const Control_Dict = {
                     return false
                 }
             },
-            parse: JSON.parse
+            parse: JSON.parse,
         },
     },
 }
@@ -3951,7 +4100,7 @@ const Control_Palette = {
                 const wrapper = ev.target.closest(".palette-wrapper")
                 ev.target.closest(".palette-row-group").remove()
                 Control_Palette._commit(wrapper, form)
-            }
+            },
         })).onEvent("click", ".palette-btn-add", function () {
             const type = this.dataset.type
             const wrapper = this.closest(".palette-wrapper")
@@ -4012,7 +4161,7 @@ const Control_Palette = {
 const Control_Table = {
     setup: ({ field }) => defaultBlockLayout(field),
     create: ({ field }) => {
-        const addButton = '<div class="table-add fa fa-plus"></div>'
+        const addButton = `<div class="table-add fa fa-plus"></div>`
         const th = [...Object.values(field.thMap), addButton]
         const table = utils.buildTable([th])
         const { key } = getCommonHTMLAttrs(field)
@@ -4029,8 +4178,8 @@ const Control_Table = {
         form.onEvent("click", ".table-add", async function () {
             const tableEl = this.closest(".table")
             const key = tableEl.dataset.key
-            const { nestedBoxes, defaultValues, thMap, ...rest } = form.getField(key)
-            const op = { title: i18n.t("global", "add"), schema: nestedBoxes, data: defaultValues, ...rest }
+            const { nestedBoxes, defaultValues, thMap, subFormOptions = {} } = form.getField(key)
+            const op = { title: i18n.t("global", "add"), schema: nestedBoxes, data: defaultValues, ...subFormOptions }
             const { response, data } = await utils.formDialog.modal(op)
             if (response === 0) return
             const ok = form.validateAndCommit(key, data, "push")
@@ -4045,9 +4194,9 @@ const Control_Table = {
             const idx = [...tableEl.querySelectorAll("tbody tr")].indexOf(trEl)
             const key = tableEl.dataset.key
             const rowValue = form.options.data[key][idx]
-            const { nestedBoxes, defaultValues, thMap, ...rest } = form.getField(key)
+            const { nestedBoxes, defaultValues, thMap, subFormOptions = {} } = form.getField(key)
             const modalValues = utils.merge(defaultValues, rowValue)  // rowValue may be missing some attributes
-            const op = { title: i18n.t("global", "edit"), schema: nestedBoxes, data: modalValues, ...rest }
+            const op = { title: i18n.t("global", "edit"), schema: nestedBoxes, data: modalValues, ...subFormOptions }
             const { response, data } = await utils.formDialog.modal(op)
             if (response === 0) return
             const ok = form.validateAndCommit(`${key}.${idx}`, data, "set")
@@ -4070,13 +4219,13 @@ const Control_Table = {
                     trEl.remove()
                     utils.notification.show(i18n.t("global", "success.deleted"))
                 }
-            }
+            },
         }))
     },
     _createTableRow: (thMap, item) => {
         const header = utils.pick(item, [...Object.keys(thMap)])
         const headerValues = [...Object.values(header)].map(headerValue => typeof headerValue === "string" ? utils.escape(headerValue) : headerValue)
-        const editButtons = '<div class="table-edit fa fa-pencil"></div><div class="table-del fa fa-trash-o"></div>'
+        const editButtons = `<div class="table-edit fa fa-pencil"></div><div class="table-del fa fa-trash-o"></div>`
         return [...headerValues, editButtons]
     },
 }
@@ -4153,7 +4302,7 @@ const Control_Composite = {
             affects: [],
             effect: (isMet, ctx) => {
                 if (isMet) state.set(field.key, { ...field.defaultValues, ...ctx.getValue(field.key) })
-            }
+            },
         })
     },
     _collectAllKeys: (schema, prefix) => {
@@ -4246,7 +4395,7 @@ const Control_Tabs = {
                 form._updateControl(key)
             }
         })
-    }
+    },
 }
 
 FastForm.registerControl("switch", Control_Switch)
@@ -4268,6 +4417,7 @@ FastForm.registerControl("code", Control_CodeEditor)
 FastForm.registerControl("object", Control_Object)
 FastForm.registerControl("array", Control_Array)
 FastForm.registerControl("select", Control_Select)
+FastForm.registerControl("segment", Control_Segment)
 FastForm.registerControl("radio", Control_Radio)
 FastForm.registerControl("checkbox", Control_Checkbox)
 FastForm.registerControl("transfer", Control_Transfer)
@@ -4278,3 +4428,9 @@ FastForm.registerControl("composite", Control_Composite)
 FastForm.registerControl("tabs", Control_Tabs)
 
 customElements.define("fast-form", FastForm)
+
+module.exports = {
+    FastForm,
+    Feature_DSLEngine,
+    Feature_StandardDSL,
+}

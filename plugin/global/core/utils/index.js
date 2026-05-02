@@ -1183,13 +1183,13 @@ class utils {
 
     static getRangy = () => {
         const range = File.editor.selection.getRangy()
-        if (range) {
-            const selection = window.getSelection()
-            const markElem = File.editor.getMarkElem(selection.anchorNode)
-            const node = File.editor.findNodeByElem(markElem)
-            const bookmark = range.getBookmark(markElem[0])
-            return { range, markElem, node, bookmark }
-        }
+        if (!range) return {}
+
+        const selection = window.getSelection()
+        const markElem = File.editor.getMarkElem(selection.anchorNode)
+        const node = File.editor.findNodeByElem(markElem)
+        const bookmark = range.getBookmark(markElem[0])
+        return { range, markElem, node, bookmark }
     }
 
     static getRangyText = () => {

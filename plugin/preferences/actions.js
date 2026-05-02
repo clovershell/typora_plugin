@@ -4,6 +4,11 @@ module.exports = (plugin) => {
     const consecutive = (onConfirmed) => utils.createConsecutiveAction({ threshold: 3, timeWindow: 3000, onConfirmed })
     const openUrl = (urlOrFn) => () => utils.openUrl(typeof urlOrFn === "function" ? urlOrFn() : urlOrFn)
     const showPluginPath = (relPath) => () => utils.showInFinder(utils.joinPluginPath(relPath))
+    const showSettings = async (title, settings) => await utils.formDialog.modal({
+        title,
+        schema: ({ Controls }) => [Controls.Code("settings").Readonly(true)],
+        data: { settings: typeof settings === "string" ? settings : JSON.stringify(settings, null, "\t") },
+    })
 
     const actions = {
         visitRepo: openUrl("https://github.com/obgnail/typora_plugin"),
@@ -68,30 +73,18 @@ module.exports = (plugin) => {
         }),
         inspectRuntimeSettings: async () => {
             const { settings } = await plugin.getCurrent()
-            await utils.formDialog.modal({
-                title: i18n._t("settings", "$label.inspectRuntimeSettings"),
-                schema: [{ fields: [{ key: "runtimeSettings", type: "code", readonly: true }] }],
-                data: { runtimeSettings: JSON.stringify(settings, null, "\t") },
-            })
+            await showSettings(i18n._t("settings", "$label.inspectRuntimeSettings"), settings)
         },
         inspectDefaultSettings: async () => {
             const path = await utils.settings.getActualPath("settings.default.toml")
             const content = await utils.Package.FsExtra.readFile(path, "utf-8")
             const settings = utils.readToml(content)?.[plugin._getCurrentPlugin()]
-            await utils.formDialog.modal({
-                title: i18n._t("settings", "$tooltip.inspectDefaultSettings"),
-                schema: [{ fields: [{ key: "defaultSettings", type: "code", readonly: true }] }],
-                data: { defaultSettings: JSON.stringify(settings, null, "\t") },
-            })
+            await showSettings(i18n._t("settings", "$tooltip.inspectDefaultSettings"), settings)
         },
         inspectAllDefaultSettings: async () => {
             const path = await utils.settings.getActualPath("settings.default.toml")
-            const content = await utils.Package.FsExtra.readFile(path, "utf-8")
-            await utils.formDialog.modal({
-                title: i18n.t("$tooltip.inspectAllDefaultSettings"),
-                schema: [{ fields: [{ key: "allDefaultSettings", type: "code", readonly: true }] }],
-                data: { allDefaultSettings: content },
-            })
+            const settings = await utils.Package.FsExtra.readFile(path, "utf-8")
+            await showSettings(i18n.t("$tooltip.inspectAllDefaultSettings"), settings)
         },
         openSettingsDefaultTomlExternally: async () => {
             const path = await utils.settings.getActualPath("settings.default.toml")
@@ -103,21 +96,22 @@ module.exports = (plugin) => {
         },
         invokeMarkdownlintSettings: async () => utils.callPluginFunction("markdownlint", "settings"),
         installPlantUMLServer: async () => {
-            const dockerFields = [{ key: "dockerCommand", type: "code", readonly: true }]
-            const actionFields = [
-                { key: "viewWebsite", type: "action", label: "Official Website" },
-                { key: "viewDockerHub", type: "action", label: "Docker Hub" },
-                { key: "viewGithub", type: "action", label: "Github" },
-            ]
             await utils.formDialog.modal({
                 title: i18n._t("plantUML", "$tooltip.installPlantUMLServer"),
-                schema: [{ fields: dockerFields, title: "Run the server with Docker" }, { fields: actionFields, title: "Help" }],
+                schema: ({ Group, Controls }) => [
+                    Controls.Code("dockerCommand").Label("Run the server with Docker").Readonly(true),
+                    Group("Help",
+                        Controls.Action("viewWebsite").Label("Official Website"),
+                        Controls.Action("viewDockerHub").Label("Docker Hub"),
+                        Controls.Action("viewGithub").Label("Github"),
+                    ),
+                ],
                 data: { dockerCommand: "docker pull plantuml/plantuml-server:jetty\ndocker run -d --name plantuml-server -p 8080:8080 plantuml/plantuml-server:jetty" },
                 actions: {
                     viewDockerHub: () => utils.openUrl("https://hub.docker.com/r/plantuml/plantuml-server"),
                     viewGithub: () => utils.openUrl("https://github.com/plantuml/plantuml-server"),
                     viewWebsite: () => utils.openUrl("https://plantuml.com/en/starting"),
-                }
+                },
             })
         },
         myopicDefocusEffectDemo: async () => {
@@ -143,7 +137,7 @@ module.exports = (plugin) => {
                 return ({ Group, Controls }) => [
                     Controls.Custom().Content(explain).Unsafe(true),
                     Group(
-                        Controls.Range("effectStrength").Label(t("$label.EFFECT_STRENGTH")).Min(0).Max(35),
+                        Controls.Range("effectStrength").Label(t("$label.EFFECT_STRENGTH")).Unit("%").Min(0).Max(35),
                         Controls.Float("screenSize").Label(t("$label.SCREEN_SIZE")).Unit(_t("$unit.inch")),
                         Controls.Integer("screenResolutionX").Label(t("$label.SCREEN_RESOLUTION_X")).Unit(_t("$unit.pixel")).Min(1),
                         Controls.Integer("screenResolutionY").Label(t("$label.SCREEN_RESOLUTION_Y")).Unit(_t("$unit.pixel")).Min(1),
@@ -180,7 +174,7 @@ module.exports = (plugin) => {
         },
         uninstallPlugin: async () => {
             const uninstall = async () => {
-                const remove = '<script src="./plugin/index.js" defer="defer"></script>'
+                const remove = `<script src="./plugin/index.js" defer="defer"></script>`
                 const windowHTML = utils.joinPluginPath("./window.html")
                 const pluginFolder = utils.joinPluginPath("./plugin")
                 try {
@@ -199,18 +193,14 @@ module.exports = (plugin) => {
             }
 
             const title = i18n.t("$label.uninstallPlugin")
-            const hintHeader = i18n.t("uninstallPluginWarning")
-            const hintDetail = i18n.t("uninstallPluginDetail", { reconfirm: title })
-            const label = i18n.t("uninstallPluginConfirmInput")
-            const op = {
+            const { response, data } = await utils.formDialog.modal({
                 title,
-                schema: [
-                    { fields: [{ type: "hint", hintHeader, hintDetail }] },
-                    { fields: [{ type: "text", key: "confirmInput", label, placeholder: title }] },
+                schema: ({ Controls }) => [
+                    Controls.Hint().HintHeader(i18n.t("uninstallPluginWarning")).HintDetail(i18n.t("uninstallPluginDetail", { reconfirm: title })),
+                    Controls.Text("confirmInput").Label(i18n.t("uninstallPluginConfirmInput")).Placeholder(title),
                 ],
                 data: { confirmInput: "" },
-            }
-            const { response, data } = await utils.formDialog.modal(op)
+            })
             if (response === 0) return
             if (data.confirmInput !== title) {
                 utils.notification.show(i18n.t("error.incorrectCommand"), "error")
@@ -251,12 +241,12 @@ module.exports = (plugin) => {
             const backersCnt = `<div style="text-align: center; font-weight: bold; margin-bottom: 5px;">THANK YOU TO ALL THE BACKERS</div><div style="display: grid; grid-template-columns: repeat(10, auto);">${backers}</div>`
             await utils.formDialog.modal({
                 title: i18n.t("$label.donate"),
-                schema: [
-                    { fields: [{ type: "custom", content: qrcodeCnt, unsafe: true }] },
-                    { fields: [{ type: "custom", content: backersCnt, unsafe: true }] },
-                    { fields: [{ type: "action", key: "starMe", label: "<b>Star This Project on GitHub</b>" }] },
+                schema: ({ Controls }) => [
+                    Controls.Custom().Content(qrcodeCnt).Unsafe(true),
+                    Controls.Custom().Content(backersCnt).Unsafe(true),
+                    Controls.Action("starMe").Label("<b>Star This Project on GitHub</b>"),
                 ],
-                actions: { starMe: actions.visitRepo }
+                actions: { starMe: actions.visitRepo },
             })
         },
     }

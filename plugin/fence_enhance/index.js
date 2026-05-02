@@ -140,7 +140,7 @@ class FenceEnhancePlugin extends BasePlugin {
                 const expand = (fence) => {
                     const cid = fence.getAttribute("cid")
                     if (EXPAND_ON_FOCUS && lastFocusFenceCid !== cid) {
-                        const btn = fence.querySelector('.enhance-btn.folded[action="fold"]')
+                        const btn = fence.querySelector(`.enhance-btn.folded[action="fold"]`)
                         if (btn) defaultFold({ btn, cid })
                         if (lastFocusFenceCid) fold(lastFocusFenceCid)
                     }
@@ -190,7 +190,7 @@ class FenceEnhancePlugin extends BasePlugin {
 
         const handleLifecycleEvents = () => {
             this.utils.exportHelper.register(this.fixedName, () => {
-                this.utils.entities.querySelectorAllInWrite('.enhance-btn.folded[action="fold"]').forEach(el => el.click())
+                this.utils.entities.querySelectorAllInWrite(`.enhance-btn.folded[action="fold"]`).forEach(el => el.click())
             })
             const eventHub = this.utils.eventHub
             eventHub.addEventListener(eventHub.eventType.allPluginsHadInjected, () => {
@@ -254,7 +254,7 @@ class FenceEnhancePlugin extends BasePlugin {
                     this.querySelector(".fence-enhance").style.visibility = ""
                 }
             }).on("mouseleave", ".md-fences", function () {
-                if (config.AUTO_HIDE && !this.querySelector('.enhance-btn.folded[action="fold"]')) {
+                if (config.AUTO_HIDE && !this.querySelector(`.enhance-btn.folded[action="fold"]`)) {
                     this.querySelector(".fence-enhance").style.visibility = "hidden"
                 }
             })
@@ -277,10 +277,10 @@ class FenceEnhancePlugin extends BasePlugin {
     }
     unregisterButton = action => this.buttons = this.buttons.filter(btn => btn.action !== action)
 
-    copyFence = fence => fence.querySelector('.enhance-btn[action="copy"]').click()
-    indentFence = fence => fence.querySelector('.enhance-btn[action="indent"]').click()
-    foldFence = fence => fence.querySelector('.enhance-btn[action="fold"]').click()
-    expandFence = fence => fence.querySelector('.enhance-btn.folded[action="fold"]')?.click()
+    copyFence = fence => fence.querySelector(`.enhance-btn[action="copy"]`).click()
+    indentFence = fence => fence.querySelector(`.enhance-btn[action="indent"]`).click()
+    foldFence = fence => fence.querySelector(`.enhance-btn[action="fold"]`).click()
+    expandFence = fence => fence.querySelector(`.enhance-btn.folded[action="fold"]`)?.click()
     indentAllFences = () => this.traverseAllFences(({ fence }) => this.indentFence(fence))
 
     traverseAllFences = (visitor) => {
@@ -326,7 +326,7 @@ class FenceEnhancePlugin extends BasePlugin {
         { act_value: "toggle_state_default_fold", act_state: this.config.DEFAULT_FOLD },
         { act_value: "add_fences_lang" },
         { act_value: "replace_fences_lang" },
-        { act_value: "indent_all_fences", act_hint: this.i18n.t("$tooltip.dangerous"), act_hidden: !this.supportIndent }
+        { act_value: "indent_all_fences", act_hint: this.i18n.t("$tooltip.dangerous"), act_hidden: !this.supportIndent },
     ])
 
     call = (action, meta) => {
@@ -334,24 +334,24 @@ class FenceEnhancePlugin extends BasePlugin {
             toggle_state_fold: () => {
                 this.config.ENABLE_FOLD = !this.config.ENABLE_FOLD
                 if (!this.config.ENABLE_FOLD) {
-                    document.querySelectorAll('.fence-enhance > .enhance-btn.folded[action="fold"]').forEach(el => el.click())
+                    document.querySelectorAll(`.fence-enhance > .enhance-btn.folded[action="fold"]`).forEach(el => el.click())
                 }
                 const display = this.config.ENABLE_FOLD ? "block" : "none"
-                document.querySelectorAll('.fence-enhance > .enhance-btn[action="fold"]').forEach(el => el.style.display = display)
+                document.querySelectorAll(`.fence-enhance > .enhance-btn[action="fold"]`).forEach(el => el.style.display = display)
             },
             toggle_state_copy: () => {
                 this.config.ENABLE_COPY = !this.config.ENABLE_COPY
                 const display = this.config.ENABLE_COPY ? "block" : "none"
-                document.querySelectorAll('.fence-enhance > [action="copy"]').forEach(el => el.style.display = display)
+                document.querySelectorAll(`.fence-enhance > [action="copy"]`).forEach(el => el.style.display = display)
             },
             toggle_state_indent: () => {
                 this.enableIndent = !this.enableIndent
                 const display = this.enableIndent ? "block" : "none"
-                document.querySelectorAll('.fence-enhance > [action="indent"]').forEach(el => el.style.display = display)
+                document.querySelectorAll(`.fence-enhance > [action="indent"]`).forEach(el => el.style.display = display)
             },
             toggle_state_default_fold: () => {
                 this.config.DEFAULT_FOLD = !this.config.DEFAULT_FOLD
-                const selector = this.config.DEFAULT_FOLD ? '.enhance-btn:not(.folded)[action="fold"]' : '.enhance-btn.folded[action="fold"]'
+                const selector = this.config.DEFAULT_FOLD ? `.enhance-btn:not(.folded)[action="fold"]` : `.enhance-btn.folded[action="fold"]`
                 let buttons = [...document.querySelectorAll(selector)]
                 if (this.config.DEFAULT_FOLD && this.config.DEFAULT_FOLD_THRESHOLD > 0) {
                     buttons = buttons.filter(btn => {
@@ -367,7 +367,7 @@ class FenceEnhancePlugin extends BasePlugin {
                 const visibility = this.config.AUTO_HIDE ? "hidden" : ""
                 document.querySelectorAll(".fence-enhance").forEach(el => {
                     // Code blocks in collapsed state cannot be hidden.
-                    el.style.visibility = el.querySelector('.enhance-btn.folded[action="fold"]') ? "" : visibility
+                    el.style.visibility = el.querySelector(`.enhance-btn.folded[action="fold"]`) ? "" : visibility
                 })
             },
             indent_all_fences: async () => {
@@ -380,27 +380,24 @@ class FenceEnhancePlugin extends BasePlugin {
                 }
             },
             add_fences_lang: async () => {
-                const op = {
+                const { response, data: { targetLang } } = await this.utils.formDialog.modal({
                     title: this.i18n.t("modal.add_fences_lang.title"),
-                    schema: [{ fields: [{ key: "targetLang", type: "text", label: this.i18n.t("modal.add_fences_lang.targetLang") }] }],
+                    schema: ({ Controls }) => [Controls.Text("targetLang").Label(this.i18n.t("modal.add_fences_lang.targetLang"))],
                     data: { targetLang: "javascript" },
-                }
-                const { response, data: { targetLang } } = await this.utils.formDialog.modal(op)
+                })
                 if (response === 1 && targetLang) {
                     await this.addFenceLang(targetLang)
                 }
             },
             replace_fences_lang: async () => {
-                const fields = [
-                    { key: "sourceLang", type: "text", label: this.i18n.t("modal.replace_fences_lang.sourceLang") },
-                    { key: "targetLang", type: "text", label: this.i18n.t("modal.replace_fences_lang.targetLang") },
-                ]
-                const op = {
+                const { response, data: { sourceLang, targetLang } } = await this.utils.formDialog.modal({
                     title: this.i18n.t("modal.replace_fences_lang.title"),
-                    schema: [{ fields }],
+                    schema: ({ Group, Controls }) => [Group(
+                        Controls.Text("sourceLang").Label(this.i18n.t("modal.replace_fences_lang.sourceLang")),
+                        Controls.Text("targetLang").Label(this.i18n.t("modal.replace_fences_lang.targetLang")),
+                    )],
                     data: { sourceLang: "js", targetLang: "javascript" },
-                }
-                const { response, data: { sourceLang, targetLang } } = await this.utils.formDialog.modal(op)
+                })
                 if (response === 1 && sourceLang && targetLang) {
                     await this.replaceFenceLang(sourceLang, targetLang)
                 }

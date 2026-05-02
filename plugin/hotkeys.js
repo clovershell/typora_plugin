@@ -33,16 +33,15 @@ class HotkeysPlugin extends BasePlugin {
     }
 
     call = async (action, meta) => {
-        const hotkeys = [...this.utils.hotkeyHub.map.keys()].sort()
-        const op = {
+        const hotkeys = [...this.utils.hotkeyHub.hotkeys.keys()].sort()
+        await this.utils.formDialog.modal({
             title: this.i18n.t("registeredHotkey"),
-            schema: [{ fields: [{ type: "textarea", key: "hotkeys", rows: 14 }] }],
+            schema: ({ Controls }) => [Controls.Textarea("hotkeys").Rows(14)],
             data: { hotkeys: JSON.stringify(hotkeys, null, "\t") },
-        }
-        await this.utils.formDialog.modal(op)
+        })
     }
 }
 
 module.exports = {
-    plugin: HotkeysPlugin
+    plugin: HotkeysPlugin,
 }

@@ -238,8 +238,8 @@ class PreferencesPlugin extends BasePlugin {
     }
 
     _getSchemas = () => {
-        const { schemas, i18n } = require("./schemas.js")
-        return i18n(schemas, this.i18n.allData)
+        const compile = require("./schemas.js")
+        return compile(this.entities.form.dsl, this.i18n.allData)
     }
 
     _getHook = () => {
